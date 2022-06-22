@@ -61,7 +61,7 @@ func newTask(delay time.Duration, key string, job func()) *Task {
 }
 
 func (tw *TimeWheel) Start() {
-	tw.loop()
+	go tw.loop()
 }
 
 func (tw *TimeWheel) loop() {
