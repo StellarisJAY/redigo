@@ -55,11 +55,12 @@ func (db *SingleDB) execute(command *redis.Command) {
 	// loop for command executor
 	exec, exists := executors[cmd]
 	if exists {
-		exec.execFunc(db, command)
+		reply := exec.execFunc(db, command)
+		conn.SendReply(reply)
 	} else {
 		log.Println("Unknown command: ", cmd)
 		// command executor doesn't exist, send unknown command to client
-		conn.Write(protocol.CreateUnknownCommandError(cmd))
+		conn.SendReply(protocol.NewErrorReply(protocol.CreateUnknownCommandError(cmd)))
 	}
 }
 

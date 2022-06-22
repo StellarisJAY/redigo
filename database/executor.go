@@ -2,10 +2,12 @@ package database
 
 import (
 	"redigo/redis"
+	"redigo/redis/protocol"
 	"strings"
 )
 
-type ExecFunc func(db *SingleDB, command *redis.Command)
+// ExecFunc executes a command using target database, returns a Reply
+type ExecFunc func(db *SingleDB, command *redis.Command) *protocol.Reply
 
 type CommandExecutor struct {
 	execFunc ExecFunc

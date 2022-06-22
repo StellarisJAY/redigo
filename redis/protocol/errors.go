@@ -1,14 +1,17 @@
 package protocol
 
+import "fmt"
+
 var (
-	ProtocolError = []byte("-Error Wrong protocol")
+	WrongArgumentNumberError = "-ERR wrong number of arguments for '%s' command"
+	UnknownCommandError      = "-ERR unknown command '%s'"
+	ProtocolError            = []byte("-Error Wrong protocol")
 )
 
-func CreateWrongArgumentNumberError(command string) []byte {
-	err := "-ERR wrong number of arguments for '" + command + "' command" + CRLF
-	return []byte(err)
+func CreateWrongArgumentNumberError(command string) error {
+	return fmt.Errorf(WrongArgumentNumberError, command)
 }
 
-func CreateUnknownCommandError(command string) []byte {
-	return []byte("-ERR unknown command '" + command + "'" + CRLF)
+func CreateUnknownCommandError(command string) error {
+	return fmt.Errorf(UnknownCommandError, command)
 }

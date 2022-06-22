@@ -14,6 +14,7 @@ type Connection struct {
 	Conn      net.Conn
 	Id        string
 	WriteChan chan []byte
+	ReplyChan chan *protocol.Reply
 	db        database.DB
 }
 
@@ -22,6 +23,7 @@ func NewConnection(conn net.Conn, id string, db database.DB) *Connection {
 		Conn:      conn,
 		Id:        id,
 		WriteChan: make(chan []byte, 102400),
+		ReplyChan: make(chan *protocol.Reply, 102400),
 		db:        db,
 	}
 }
@@ -62,6 +64,12 @@ func (c *Connection) WriteLoop() error {
 			if err != nil {
 				return err
 			}
+
+		case reply := <-c.ReplyChan:
+			_, err := c.Conn.Write(reply.ToBytes())
+			if err != nil {
+				return err
+			}
 		}
 	}
 }
@@ -75,4 +83,8 @@ func (c *Connection) Close() {
 
 func (c *Connection) Write(data []byte) {
 	c.WriteChan <- data
+}
+
+func (c *Connection) SendReply(reply *protocol.Reply) {
+	c.ReplyChan <- reply
 }
