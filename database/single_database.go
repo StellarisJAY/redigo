@@ -6,7 +6,9 @@ import (
 	"redigo/datastruct/lock"
 	"redigo/redis"
 	"redigo/redis/protocol"
+	"redigo/util/timewheel"
 	"strings"
+	"time"
 )
 
 type SingleDB struct {
@@ -62,6 +64,26 @@ func (db *SingleDB) execute(command redis.Command) {
 		// command executor doesn't exist, send unknown command to client
 		conn.SendReply(protocol.NewErrorReply(protocol.CreateUnknownCommandError(cmd)))
 	}
+}
+
+// Expire set a key's expire time
+func (db *SingleDB) Expire(key string, ttl time.Duration) {
+	expireTime := time.Now().Add(ttl)
+	db.ttlMap.Put(key, expireTime)
+	// schedule auto remove in time wheel
+	timewheel.ScheduleDelayed(ttl, "expire_"+key, func() {
+		ttl, exists := db.ttlMap.Get(key)
+		if !exists {
+			return
+		}
+		expireAt := ttl.(time.Time)
+		// check if expire time before now
+		if expired := time.Now().After(expireAt); expired {
+			db.ttlMap.Remove(key)
+			db.data.Remove(key)
+			log.Println("Expired Key removed: ", key)
+		}
+	})
 }
 
 func (db *SingleDB) Close() {

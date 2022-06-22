@@ -1,15 +1,19 @@
 package database
 
 import (
+	"log"
 	"redigo/redis"
 	"redigo/redis/protocol"
 	"strconv"
+	"time"
 )
 
 const (
 	defaultPolicy = 0
 	insertPolicy  = 1
 	updatePolicy  = 2
+
+	infiniteExpireTime = 0
 )
 
 func init() {
@@ -32,12 +36,31 @@ func executeSet(db *SingleDB, command redis.Command) *protocol.Reply {
 	value := args[1]
 	// parse args, determine 'SET' Policy: NX or XX or default
 	policy := defaultPolicy
-	for _, a := range args {
+	expireTime := infiniteExpireTime
+	var delay time.Duration
+	for i, a := range args {
 		arg := string(a)
 		if arg == "NX" {
 			policy = insertPolicy
 		} else if arg == "XX" {
 			policy = updatePolicy
+		} else if arg == "EX" || arg == "PX" {
+			if expireTime != infiniteExpireTime || i == len(args)-1 {
+				return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("set "))
+			}
+			if num, err := strconv.Atoi(string(args[i+1])); err != nil {
+				log.Println("Error arg: ", arg)
+				return protocol.NewErrorReply(protocol.HashValueNotIntegerError)
+			} else {
+				expireTime = num
+				switch arg {
+				case "EX":
+					delay = time.Duration(expireTime) * time.Second
+				case "PX":
+					delay = time.Duration(expireTime) * time.Millisecond
+				}
+
+			}
 		}
 	}
 
@@ -50,6 +73,10 @@ func executeSet(db *SingleDB, command redis.Command) *protocol.Reply {
 		result = db.data.PutIfAbsent(key, entry)
 	case updatePolicy:
 		result = db.data.PutIfExists(key, entry)
+	}
+	// set ttl
+	if expireTime != infiniteExpireTime {
+		db.Expire(key, delay)
 	}
 	if result == 0 {
 		return protocol.NilReply
