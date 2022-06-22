@@ -9,29 +9,43 @@ type Reply struct {
 	err             error
 	number          int
 	bulkStringArray [][]byte
+	singleStr       string
 }
 
 func NewNumberReply(number int) *Reply {
 	return &Reply{number: number}
 }
 
-func NewSingleValueReply(value []byte) *Reply {
+func NewBulkValueReply(value []byte) *Reply {
 	arr := make([][]byte, 0)
 	arr = append(arr, value)
 	return &Reply{
 		err:             nil,
 		number:          -1,
 		bulkStringArray: arr,
+		singleStr:       "",
 	}
 }
 
-func NewSingleStringReply(value string) *Reply {
+// NewBulkStringReply returns a reply with multi-lined Bulk String
+func NewBulkStringReply(value string) *Reply {
 	arr := make([][]byte, 0)
 	arr = append(arr, []byte(value))
 	return &Reply{
 		err:             nil,
 		number:          -1,
 		bulkStringArray: arr,
+		singleStr:       "",
+	}
+}
+
+// NewSingleStringReply returns a reply with Single-lined string
+func NewSingleStringReply(value string) *Reply {
+	return &Reply{
+		err:             nil,
+		number:          -1,
+		bulkStringArray: nil,
+		singleStr:       value,
 	}
 }
 
@@ -40,6 +54,7 @@ func NewArrayReply(arr [][]byte) *Reply {
 		err:             nil,
 		number:          -1,
 		bulkStringArray: arr,
+		singleStr:       "",
 	}
 }
 
@@ -52,6 +67,7 @@ func NewStringArrayReply(arr []string) *Reply {
 		err:             nil,
 		number:          -1,
 		bulkStringArray: bulkArr,
+		singleStr:       "",
 	}
 }
 
@@ -60,6 +76,7 @@ func NewErrorReply(err error) *Reply {
 		err:             err,
 		number:          -1,
 		bulkStringArray: nil,
+		singleStr:       "",
 	}
 }
 
@@ -67,7 +84,9 @@ func NewErrorReply(err error) *Reply {
 	Format Reply to RESP bytes
 */
 func (r *Reply) ToBytes() []byte {
-	if r.bulkStringArray != nil {
+	if r.singleStr != "" {
+		return []byte("+" + r.singleStr + CRLF)
+	} else if r.bulkStringArray != nil {
 		if len(r.bulkStringArray) == 1 {
 			return []byte("+" + string(r.bulkStringArray[0]) + CRLF)
 		} else {
