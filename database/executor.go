@@ -7,7 +7,7 @@ import (
 )
 
 // ExecFunc executes a command using target database, returns a Reply
-type ExecFunc func(db *SingleDB, command *redis.Command) *protocol.Reply
+type ExecFunc func(db *SingleDB, command redis.Command) *protocol.Reply
 
 type CommandExecutor struct {
 	execFunc ExecFunc

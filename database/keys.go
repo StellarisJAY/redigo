@@ -9,7 +9,7 @@ func init() {
 	RegisterCommandExecutor("keys", execKeys)
 }
 
-func execKeys(db *SingleDB, command *redis.Command) *protocol.Reply {
+func execKeys(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
 	if len(args) == 0 {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("keys"))

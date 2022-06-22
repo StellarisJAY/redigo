@@ -14,7 +14,7 @@ type SingleDB struct {
 	ttlMap      dict.Dict
 	lock        *lock.Locker
 	idx         int
-	commandChan chan *redis.Command
+	commandChan chan redis.Command
 }
 
 func NewSingleDB(idx int, commandChanSize int) *SingleDB {
@@ -23,7 +23,7 @@ func NewSingleDB(idx int, commandChanSize int) *SingleDB {
 		ttlMap:      dict.NewSimpleDict(),
 		lock:        lock.NewLock(1024),
 		idx:         idx,
-		commandChan: make(chan *redis.Command, commandChanSize),
+		commandChan: make(chan redis.Command, commandChanSize),
 	}
 }
 
@@ -36,7 +36,7 @@ func (db *SingleDB) ExecuteLoop() error {
 	}
 }
 
-func (db *SingleDB) SubmitCommand(command *redis.Command) {
+func (db *SingleDB) SubmitCommand(command redis.Command) {
 	// submit a command to command channel
 	db.commandChan <- command
 }
@@ -45,11 +45,11 @@ func (db *SingleDB) SubmitCommand(command *redis.Command) {
 	Execute a command
 	Finds the executor in executor map, then call execFunc to handle it
 */
-func (db *SingleDB) execute(command *redis.Command) {
+func (db *SingleDB) execute(command redis.Command) {
 	cmd := strings.ToLower(command.Get(0))
 	conn := command.Connection()
 	if cmd == "command" {
-		conn.Write(protocol.OKReplyBytes)
+		conn.SendReply(protocol.OKReply)
 		return
 	}
 	// loop for command executor

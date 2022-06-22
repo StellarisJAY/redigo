@@ -23,7 +23,7 @@ func init() {
 	RegisterCommandExecutor("decrby", executeDecrby)
 }
 
-func executeSet(db *SingleDB, command *redis.Command) *protocol.Reply {
+func executeSet(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
 	if len(args) < 2 {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("set"))
@@ -52,13 +52,13 @@ func executeSet(db *SingleDB, command *redis.Command) *protocol.Reply {
 		result = db.data.PutIfExists(key, entry)
 	}
 	if result == 0 {
-		return protocol.NewSingleStringReply("(nil)")
+		return protocol.NilReply
 	} else {
-		return protocol.NewSingleStringReply("OK")
+		return protocol.OKReply
 	}
 }
 
-func executeGet(db *SingleDB, command *redis.Command) *protocol.Reply {
+func executeGet(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
 	if args == nil || len(args) == 0 {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("get"))
@@ -70,11 +70,11 @@ func executeGet(db *SingleDB, command *redis.Command) *protocol.Reply {
 		value := entry.Data.([]byte)
 		return protocol.NewBulkValueReply(value)
 	} else {
-		return protocol.NewSingleStringReply("(nil)")
+		return protocol.NilReply
 	}
 }
 
-func executeSetNX(db *SingleDB, command *redis.Command) *protocol.Reply {
+func executeSetNX(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
 	if len(args) < 2 {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("setnx"))
@@ -86,7 +86,7 @@ func executeSetNX(db *SingleDB, command *redis.Command) *protocol.Reply {
 	return protocol.NewNumberReply(exists)
 }
 
-func executeAppend(db *SingleDB, command *redis.Command) *protocol.Reply {
+func executeAppend(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
 	if len(args) < 2 {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("append"))
@@ -112,7 +112,7 @@ func executeAppend(db *SingleDB, command *redis.Command) *protocol.Reply {
 	return protocol.NewNumberReply(length)
 }
 
-func executeIncr(db *SingleDB, command *redis.Command) *protocol.Reply {
+func executeIncr(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
 	if len(args) != 1 {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("incr"))
@@ -121,7 +121,7 @@ func executeIncr(db *SingleDB, command *redis.Command) *protocol.Reply {
 	return add(db, key, 1)
 }
 
-func executeDecr(db *SingleDB, command *redis.Command) *protocol.Reply {
+func executeDecr(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
 	if len(args) != 1 {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("decr"))
@@ -130,7 +130,7 @@ func executeDecr(db *SingleDB, command *redis.Command) *protocol.Reply {
 	return add(db, key, -1)
 }
 
-func executeIncrby(db *SingleDB, command *redis.Command) *protocol.Reply {
+func executeIncrby(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
 	if len(args) != 2 {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("incrby"))
@@ -144,7 +144,7 @@ func executeIncrby(db *SingleDB, command *redis.Command) *protocol.Reply {
 	}
 }
 
-func executeDecrby(db *SingleDB, command *redis.Command) *protocol.Reply {
+func executeDecrby(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
 	if len(args) != 2 {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("decrby"))

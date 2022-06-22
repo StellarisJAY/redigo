@@ -3,8 +3,9 @@ package tcp
 import (
 	"log"
 	"net"
+	"net/http"
+	_ "net/http/pprof"
 	"redigo/interface/database"
-	"redigo/interface/tcp"
 	"sync"
 )
 
@@ -14,22 +15,20 @@ type Handler interface {
 
 type Server struct {
 	address        string
-	activeConns    map[string]tcp.Connection
+	activeConns    sync.Map
 	commandHandler *Handler
 	listener       net.Listener
 	closeChan      chan struct{}
 	db             database.DB
-	mutex          sync.Mutex
 }
 
 func NewServer(address string, db database.DB) *Server {
 	return &Server{
 		address:        address,
-		activeConns:    make(map[string]tcp.Connection),
+		activeConns:    sync.Map{},
 		commandHandler: nil,
 		listener:       nil,
 		closeChan:      make(chan struct{}),
-		mutex:          sync.Mutex{},
 		db:             db,
 	}
 }
@@ -52,14 +51,17 @@ func (s *Server) Start() error {
 	go func() {
 		// wait for close signal
 		<-s.closeChan
-		// close all connections
-		s.mutex.Lock()
-		defer s.mutex.Unlock()
-		for _, v := range s.activeConns {
-			v.Close()
-		}
+		s.activeConns.Range(func(key, value interface{}) bool {
+			key.(*Connection).Close()
+			return true
+		})
 	}()
 
+	go func() {
+		_ = http.ListenAndServe(":8899", nil)
+	}()
+
+	log.Println("Redigo Server Started, listen:", listener.Addr())
 	// run acceptor
 	err = s.acceptLoop()
 	if err != nil {
@@ -82,29 +84,27 @@ func (s *Server) acceptLoop() error {
 			continue
 		}
 		// create connection struct
-		connection := NewConnection(conn, "01", s.db)
+		connection := NewConnection(conn, s.db)
 		// Store active conn
-		s.activeConns[connection.Id] = connection
+		s.activeConns.Store(connection, 1)
 		// start read loop
-		go func() {
-			rErr := connection.ReadLoop()
+		go func(connect *Connection) {
+			rErr := connect.ReadLoop()
 			if rErr != nil {
-				connection.Close()
-				s.mutex.Lock()
-				defer s.mutex.Unlock()
-				delete(s.activeConns, connection.Id)
+				connect.Close()
+				log.Println("Connection closed by remote client: ", connect.Conn.RemoteAddr().String())
 			}
-		}()
+			s.activeConns.Delete(connect)
+		}(connection)
 
 		// start write loop
-		go func() {
-			wErr := connection.WriteLoop()
+		go func(connect *Connection) {
+			wErr := connect.WriteLoop()
 			if wErr != nil {
-				connection.Close()
-				s.mutex.Lock()
-				defer s.mutex.Unlock()
-				delete(s.activeConns, connection.Id)
+				connect.Close()
+				log.Println("Connection closed by remote client: ", connect.Conn.RemoteAddr().String())
 			}
-		}()
+			s.activeConns.Delete(connect)
+		}(connection)
 	}
 }
