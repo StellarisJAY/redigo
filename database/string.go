@@ -3,6 +3,7 @@ package database
 import (
 	"redigo/redis"
 	"redigo/redis/protocol"
+	"strconv"
 )
 
 const (
@@ -16,6 +17,10 @@ func init() {
 	RegisterCommandExecutor("get", executeGet)
 	RegisterCommandExecutor("setnx", executeSetNX)
 	RegisterCommandExecutor("append", executeAppend)
+	RegisterCommandExecutor("incr", executeIncr)
+	RegisterCommandExecutor("decr", executeDecr)
+	RegisterCommandExecutor("incrby", executeIncrby)
+	RegisterCommandExecutor("decrby", executeDecrby)
 }
 
 func executeSet(db *SingleDB, command *redis.Command) *protocol.Reply {
@@ -105,4 +110,72 @@ func executeAppend(db *SingleDB, command *redis.Command) *protocol.Reply {
 		length = len(appendValue)
 	}
 	return protocol.NewNumberReply(length)
+}
+
+func executeIncr(db *SingleDB, command *redis.Command) *protocol.Reply {
+	args := command.Args()
+	if len(args) != 1 {
+		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("incr"))
+	}
+	key := string(args[0])
+	return add(db, key, 1)
+}
+
+func executeDecr(db *SingleDB, command *redis.Command) *protocol.Reply {
+	args := command.Args()
+	if len(args) != 1 {
+		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("decr"))
+	}
+	key := string(args[0])
+	return add(db, key, -1)
+}
+
+func executeIncrby(db *SingleDB, command *redis.Command) *protocol.Reply {
+	args := command.Args()
+	if len(args) != 2 {
+		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("incrby"))
+	}
+	key := string(args[0])
+	deltaStr := string(args[1])
+	if delta, err := strconv.Atoi(deltaStr); err != nil {
+		return protocol.NewErrorReply(protocol.HashValueNotIntegerError)
+	} else {
+		return add(db, key, delta)
+	}
+}
+
+func executeDecrby(db *SingleDB, command *redis.Command) *protocol.Reply {
+	args := command.Args()
+	if len(args) != 2 {
+		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("decrby"))
+	}
+	key := string(args[0])
+	deltaStr := string(args[1])
+	if delta, err := strconv.Atoi(deltaStr); err != nil {
+		return protocol.NewErrorReply(protocol.HashValueNotIntegerError)
+	} else {
+		return add(db, key, -delta)
+	}
+}
+
+// add : add a delta value to the key's value
+func add(db *SingleDB, key string, delta int) *protocol.Reply {
+	v, exists := db.data.Get(key)
+	if exists {
+		entry := v.(*Entry)
+		s := string(entry.Data.([]byte))
+		if val, err := strconv.Atoi(s); err != nil {
+			return protocol.NewErrorReply(protocol.HashValueNotIntegerError)
+		} else {
+			val = val + delta
+			value := []byte(strconv.Itoa(val))
+			entry.Data = value
+			db.data.Put(key, entry)
+			return protocol.NewNumberReply(val)
+		}
+	} else {
+		entry := &Entry{Data: []byte(strconv.Itoa(delta))}
+		db.data.Put(key, entry)
+		return protocol.NewNumberReply(delta)
+	}
 }
