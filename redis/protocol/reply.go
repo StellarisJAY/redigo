@@ -5,6 +5,11 @@ import (
 	"strings"
 )
 
+var (
+	OKReply  = &Reply{singleStr: "OK"}
+	NilReply = &Reply{singleStr: "(nil)"}
+)
+
 type Reply struct {
 	err             error
 	number          int
