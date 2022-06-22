@@ -5,6 +5,12 @@ import (
 	"redigo/redis/protocol"
 )
 
+const (
+	defaultPolicy = 0
+	insertPolicy  = 1
+	updatePolicy  = 2
+)
+
 func init() {
 	RegisterCommandExecutor("set", executeSet)
 	RegisterCommandExecutor("get", executeGet)
@@ -18,9 +24,32 @@ func executeSet(db *SingleDB, command *redis.Command) *protocol.Reply {
 	}
 	key := string(args[0])
 	value := args[1]
+	// parse args, determine 'SET' Policy: NX or XX or default
+	policy := defaultPolicy
+	for _, a := range args {
+		arg := string(a)
+		if arg == "NX" {
+			policy = insertPolicy
+		} else if arg == "XX" {
+			policy = updatePolicy
+		}
+	}
+
 	entry := &Entry{Data: value}
-	res := db.data.Put(key, entry)
-	return protocol.NewNumberReply(res)
+	var result int
+	switch policy {
+	case defaultPolicy:
+		result = db.data.Put(key, entry)
+	case insertPolicy:
+		result = db.data.PutIfAbsent(key, entry)
+	case updatePolicy:
+		result = db.data.PutIfExists(key, entry)
+	}
+	if result == 0 {
+		return protocol.NewSingleStringReply("(nil)")
+	} else {
+		return protocol.NewSingleStringReply("OK")
+	}
 }
 
 func executeGet(db *SingleDB, command *redis.Command) *protocol.Reply {
@@ -33,7 +62,7 @@ func executeGet(db *SingleDB, command *redis.Command) *protocol.Reply {
 	if exists {
 		entry := v.(*Entry)
 		value := entry.Data.([]byte)
-		return protocol.NewSingleValueReply(value)
+		return protocol.NewBulkValueReply(value)
 	} else {
 		return protocol.NewSingleStringReply("(nil)")
 	}
