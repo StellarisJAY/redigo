@@ -2,8 +2,8 @@ package tcp
 
 import (
 	"bufio"
+	"context"
 	"io"
-	"log"
 	"net"
 	"redigo/interface/database"
 	"redigo/redis/parser"
@@ -12,19 +12,20 @@ import (
 
 type Connection struct {
 	Conn      net.Conn
-	Id        string
-	WriteChan chan []byte
 	ReplyChan chan *protocol.Reply
 	db        database.DB
+	ctx       context.Context
+	cancel    context.CancelFunc
 }
 
-func NewConnection(conn net.Conn, id string, db database.DB) *Connection {
+func NewConnection(conn net.Conn, db database.DB) *Connection {
+	ctx, cancel := context.WithCancel(context.Background())
 	return &Connection{
 		Conn:      conn,
-		Id:        id,
-		WriteChan: make(chan []byte, 102400),
-		ReplyChan: make(chan *protocol.Reply, 102400),
+		ReplyChan: make(chan *protocol.Reply, 1024),
 		db:        db,
+		cancel:    cancel,
+		ctx:       ctx,
 	}
 }
 
@@ -41,13 +42,11 @@ func (c *Connection) ReadLoop() error {
 		if err != nil {
 			// Read failed, connection closed
 			if err == io.EOF {
-				log.Println("Connection closed by remote client: ", c.Conn.RemoteAddr().String())
 				return err
 			}
-			c.WriteChan <- protocol.ProtocolError
 		} else {
 			cmd.BindConnection(c)
-			c.db.SubmitCommand(cmd)
+			c.db.SubmitCommand(*cmd)
 		}
 	}
 }
@@ -59,17 +58,13 @@ func (c *Connection) ReadLoop() error {
 func (c *Connection) WriteLoop() error {
 	for {
 		select {
-		case payload := <-c.WriteChan:
-			_, err := c.Conn.Write(payload)
-			if err != nil {
-				return err
-			}
-
 		case reply := <-c.ReplyChan:
 			_, err := c.Conn.Write(reply.ToBytes())
 			if err != nil {
 				return err
 			}
+		case <-c.ctx.Done():
+			return nil
 		}
 	}
 }
@@ -79,10 +74,8 @@ func (c *Connection) WriteLoop() error {
 */
 func (c *Connection) Close() {
 	_ = c.Conn.Close()
-}
-
-func (c *Connection) Write(data []byte) {
-	c.WriteChan <- data
+	c.ReplyChan = nil
+	c.cancel()
 }
 
 func (c *Connection) SendReply(reply *protocol.Reply) {
