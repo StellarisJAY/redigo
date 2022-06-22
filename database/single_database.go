@@ -86,6 +86,19 @@ func (db *SingleDB) Expire(key string, ttl time.Duration) {
 	})
 }
 
+func (db *SingleDB) TTL(key string) time.Duration {
+	v, exists := db.ttlMap.Get(key)
+	if exists {
+		expireTime := v.(time.Time)
+		ttl := expireTime.Sub(time.Now())
+		if ttl < 0 {
+			return 0
+		}
+		return ttl
+	}
+	return -1
+}
+
 func (db *SingleDB) Close() {
 	//TODO implement me
 	panic("implement me")
