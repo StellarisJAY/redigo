@@ -15,6 +15,7 @@ func init() {
 	RegisterCommandExecutor("set", executeSet)
 	RegisterCommandExecutor("get", executeGet)
 	RegisterCommandExecutor("setnx", executeSetNX)
+	RegisterCommandExecutor("append", executeAppend)
 }
 
 func executeSet(db *SingleDB, command *redis.Command) *protocol.Reply {
@@ -78,4 +79,30 @@ func executeSetNX(db *SingleDB, command *redis.Command) *protocol.Reply {
 	entry := &Entry{Data: value}
 	exists := db.data.PutIfAbsent(key, entry)
 	return protocol.NewNumberReply(exists)
+}
+
+func executeAppend(db *SingleDB, command *redis.Command) *protocol.Reply {
+	args := command.Args()
+	if len(args) < 2 {
+		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("append"))
+	}
+	key := string(args[0])
+	appendValue := args[1]
+	v, exists := db.data.Get(key)
+	var length int
+	if exists {
+		entry := v.(*Entry)
+		originalValue := entry.Data.([]byte)
+		value := make([]byte, len(originalValue)+len(appendValue))
+		copy(value[0:len(originalValue)], originalValue)
+		copy(value[len(originalValue):], appendValue)
+		entry.Data = value
+		_ = db.data.Put(key, entry)
+		length = len(value)
+	} else {
+		entry := &Entry{Data: appendValue}
+		_ = db.data.Put(key, entry)
+		length = len(appendValue)
+	}
+	return protocol.NewNumberReply(length)
 }
