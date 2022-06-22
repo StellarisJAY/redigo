@@ -1,10 +1,14 @@
 package protocol
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
 
 var (
 	WrongArgumentNumberError = "-ERR wrong number of arguments for '%s' command"
 	UnknownCommandError      = "-ERR unknown command '%s'"
+	HashValueNotIntegerError = errors.New("-ERR hash value is not an integer")
 	ProtocolError            = []byte("-Error Wrong protocol")
 )
 
