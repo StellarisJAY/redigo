@@ -47,7 +47,7 @@ func NewTimeWheel(interval time.Duration, slotNum int) *TimeWheel {
 	return timeWheel
 }
 
-func (tw *TimeWheel) Schedule(delay time.Duration, key string, job func()) {
+func (tw *TimeWheel) schedule(delay time.Duration, key string, job func()) {
 	task := newTask(delay, key, job)
 	tw.AddTask(task)
 }
