@@ -9,12 +9,10 @@ func init() {
 	RegisterCommandExecutor("keys", execKeys)
 }
 
-func execKeys(db *SingleDB, command *redis.Command) {
+func execKeys(db *SingleDB, command *redis.Command) *protocol.Reply {
 	args := command.Args()
-	conn := command.Connection()
 	if len(args) == 0 {
-		conn.Write(protocol.CreateWrongArgumentNumberError("keys"))
-		return
+		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("keys"))
 	}
 	keys := make([]string, db.data.Len())
 	i := 0
@@ -24,5 +22,5 @@ func execKeys(db *SingleDB, command *redis.Command) {
 		i++
 		return true
 	})
-	conn.Write(protocol.CreateBulkStringArrayReply(keys))
+	return protocol.NewStringArrayReply(keys)
 }

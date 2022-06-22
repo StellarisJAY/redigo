@@ -11,48 +11,42 @@ func init() {
 	RegisterCommandExecutor("setnx", executeSetNX)
 }
 
-func executeSet(db *SingleDB, command *redis.Command) {
+func executeSet(db *SingleDB, command *redis.Command) *protocol.Reply {
 	args := command.Args()
-	conn := command.Connection()
 	if len(args) < 2 {
-		conn.Write(protocol.CreateWrongArgumentNumberError("set"))
-		return
+		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("set"))
 	}
 	key := string(args[0])
 	value := args[1]
 	entry := &Entry{Data: value}
 	res := db.data.Put(key, entry)
-	conn.Write(protocol.CreateNumberReply(res))
+	return protocol.NewNumberReply(res)
 }
 
-func executeGet(db *SingleDB, command *redis.Command) {
+func executeGet(db *SingleDB, command *redis.Command) *protocol.Reply {
 	args := command.Args()
-	conn := command.Connection()
 	if args == nil || len(args) == 0 {
-		conn.Write(protocol.CreateWrongArgumentNumberError("get"))
-		return
+		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("get"))
 	}
 	key := string(args[0])
 	v, exists := db.data.Get(key)
 	if exists {
 		entry := v.(*Entry)
 		value := entry.Data.([]byte)
-		conn.Write(protocol.CreateSingleStringReply(string(value)))
+		return protocol.NewSingleValueReply(value)
 	} else {
-		conn.Write(protocol.CreateSingleStringReply("(nil)"))
+		return protocol.NewSingleStringReply("(nil)")
 	}
 }
 
-func executeSetNX(db *SingleDB, command *redis.Command) {
+func executeSetNX(db *SingleDB, command *redis.Command) *protocol.Reply {
 	args := command.Args()
-	conn := command.Connection()
 	if len(args) < 2 {
-		conn.Write(protocol.CreateWrongArgumentNumberError("setnx"))
-		return
+		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("setnx"))
 	}
 	key := string(args[0])
 	value := args[1]
 	entry := &Entry{Data: value}
 	exists := db.data.PutIfAbsent(key, entry)
-	conn.Write(protocol.CreateNumberReply(exists))
+	return protocol.NewNumberReply(exists)
 }
