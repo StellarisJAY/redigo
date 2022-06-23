@@ -76,6 +76,33 @@ func (l *LinkedList) Right() []byte {
 	}
 }
 
+func (l *LinkedList) Size() int {
+	return l.size
+}
+
+func (l *LinkedList) RemoveLeft() []byte {
+	if l.left == nil {
+		return nil
+	}
+	if l.left == l.right {
+		val := l.left.value
+		l.left = nil
+		l.right = nil
+		l.size--
+		return val
+	}
+	if l.left != nil {
+		next := l.left.next
+		left := l.left
+		next.prev = nil
+		left.next = nil
+		l.left = next
+		l.size--
+		return left.value
+	}
+	return nil
+}
+
 func NewLinkedList(vals ...[]byte) *LinkedList {
 	l := &LinkedList{}
 	for _, val := range vals {
