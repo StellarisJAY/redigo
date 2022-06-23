@@ -4,6 +4,7 @@ import (
 	"log"
 	"redigo/redis"
 	"redigo/redis/protocol"
+	"reflect"
 	"strconv"
 	"time"
 )
@@ -94,8 +95,13 @@ func executeGet(db *SingleDB, command redis.Command) *protocol.Reply {
 	v, exists := db.data.Get(key)
 	if exists {
 		entry := v.(*Entry)
-		value := entry.Data.([]byte)
-		return protocol.NewBulkValueReply(value)
+		if reflect.TypeOf(entry.Data).String() == "[]uint8" {
+			value := entry.Data.([]byte)
+			return protocol.NewBulkValueReply(value)
+		} else {
+			return protocol.NewErrorReply(protocol.WrongTypeOperationError)
+		}
+
 	} else {
 		return protocol.NilReply
 	}
