@@ -99,6 +99,14 @@ func (db *SingleDB) TTL(key string) time.Duration {
 	return -1
 }
 
+func (db *SingleDB) CancelTTL(key string) {
+	_, exists := db.ttlMap.Get(key)
+	if exists {
+		db.ttlMap.Remove(key)
+		timewheel.Cancel("expire_" + key)
+	}
+}
+
 func (db *SingleDB) Close() {
 	//TODO implement me
 	panic("implement me")
