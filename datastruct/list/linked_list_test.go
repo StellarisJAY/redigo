@@ -47,3 +47,31 @@ func TestLinkedList_Get(t *testing.T) {
 		}
 	}
 }
+
+func TestLinkedList_RemoveLeft(t *testing.T) {
+	list := NewLinkedList()
+	list.AddRight([]byte("v1"))
+	list.AddRight([]byte("v2"))
+	list.AddRight([]byte("v3"))
+
+	if string(list.RemoveLeft()) != "v1" || string(list.RemoveLeft()) != "v2" || string(list.RemoveLeft()) != "v3" {
+		t.Fail()
+	}
+	if list.Left() != nil || list.Right() != nil || list.Size() != 0 {
+		t.Fail()
+	}
+}
+
+func TestLinkedList_RemoveRight(t *testing.T) {
+	list := NewLinkedList()
+	list.AddLeft([]byte("v1"))
+	list.AddLeft([]byte("v2"))
+	list.AddLeft([]byte("v3"))
+
+	if string(list.RemoveRight()) != "v1" || string(list.RemoveRight()) != "v2" || string(list.RemoveRight()) != "v3" {
+		t.Fail()
+	}
+	if list.Left() != nil || list.Right() != nil || list.Size() != 0 {
+		t.Fail()
+	}
+}
