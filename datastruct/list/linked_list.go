@@ -120,6 +120,37 @@ func (l *LinkedList) RemoveRight() []byte {
 	return right.value
 }
 
+func (l *LinkedList) getNode(idx int) *node {
+	if idx >= l.size || idx < 0 {
+		return nil
+	}
+	n := l.left
+	for i := 0; i < idx; i++ {
+		n = n.next
+	}
+	return n
+}
+
+func (l *LinkedList) LeftRange(start, end int) [][]byte {
+	if start >= l.Size() || end < start {
+		return nil
+	}
+	if start < 0 {
+		start = 0
+	}
+	if end >= l.Size() {
+		end = l.Size() - 1
+	}
+
+	n := l.getNode(start)
+	result := make([][]byte, end-start+1)
+	for i := 0; n != nil && i+start <= end; i++ {
+		result[i] = n.value
+		n = n.next
+	}
+	return result
+}
+
 func NewLinkedList(vals ...[]byte) *LinkedList {
 	l := &LinkedList{}
 	for _, val := range vals {
