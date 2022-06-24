@@ -9,11 +9,8 @@ func NewSimpleDict() *SimpleDict {
 }
 
 func (s *SimpleDict) Put(key string, value interface{}) int {
-	_, exists := s.store[key]
+	_, _ = s.store[key]
 	s.store[key] = value
-	if exists {
-		return 0
-	}
 	return 1
 }
 
