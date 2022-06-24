@@ -1,7 +1,6 @@
 package database
 
 import (
-	"log"
 	"redigo/datastruct/list"
 	"redigo/redis"
 	"redigo/redis/protocol"
@@ -15,6 +14,7 @@ func init() {
 	RegisterCommandExecutor("rpush", execRPush)
 	RegisterCommandExecutor("rpop", execRPop)
 	RegisterCommandExecutor("lrange", execLRange)
+	RegisterCommandExecutor("lindex", execLIndex)
 }
 
 func execLPush(db *SingleDB, command redis.Command) *protocol.Reply {
@@ -31,7 +31,7 @@ func execLPush(db *SingleDB, command redis.Command) *protocol.Reply {
 		db.data.Put(key, entry)
 	} else {
 		entry := v.(*Entry)
-		if reflect.TypeOf(entry.Data).String() == "*list.LinkedList" {
+		if isLinkedList(entry) {
 			linkedList = entry.Data.(*list.LinkedList)
 		} else {
 			return protocol.NewErrorReply(protocol.WrongTypeOperationError)
@@ -52,7 +52,7 @@ func execLPop(db *SingleDB, command redis.Command) *protocol.Reply {
 	v, exist := db.data.Get(key)
 	if exist {
 		entry := v.(*Entry)
-		if reflect.TypeOf(entry.Data).String() == "*list.LinkedList" {
+		if isLinkedList(entry) {
 			linkedList := entry.Data.(*list.LinkedList)
 			left := linkedList.RemoveLeft()
 			if left != nil {
@@ -77,7 +77,7 @@ func execRPush(db *SingleDB, command redis.Command) *protocol.Reply {
 	var linkedList *list.LinkedList
 	if exists {
 		entry := v.(*Entry)
-		if reflect.TypeOf(entry.Data).String() != "*list.LinkedList" {
+		if !isLinkedList(entry) {
 			return protocol.NewErrorReply(protocol.WrongTypeOperationError)
 		}
 		linkedList = entry.Data.(*list.LinkedList)
@@ -101,11 +101,12 @@ func execRPop(db *SingleDB, command redis.Command) *protocol.Reply {
 	v, exists := db.data.Get(key)
 	if exists {
 		entry := v.(*Entry)
-		if reflect.TypeOf(entry.Data).String() != "*list.LinkedList" {
-			log.Println("Type of entry: ", reflect.TypeOf(entry.Data).String())
+		// check if entry is linked list
+		if !isLinkedList(entry) {
 			return protocol.NewErrorReply(protocol.WrongTypeOperationError)
 		}
 		linkedList := entry.Data.(*list.LinkedList)
+		// pop right element
 		right := linkedList.RemoveRight()
 		if right != nil {
 			return protocol.NewBulkValueReply(right)
@@ -133,7 +134,7 @@ func execLRange(db *SingleDB, command redis.Command) *protocol.Reply {
 	}
 	entry := v.(*Entry)
 	// check key dataStructure
-	if reflect.TypeOf(entry.Data).String() != "*list.LinkedList" {
+	if !isLinkedList(entry) {
 		return protocol.NewErrorReply(protocol.WrongTypeOperationError)
 	}
 	linkedList := entry.Data.(*list.LinkedList)
@@ -147,4 +148,41 @@ func execLRange(db *SingleDB, command redis.Command) *protocol.Reply {
 		return protocol.NewArrayReply(result)
 	}
 	return protocol.EmptyListReply
+}
+
+func execLIndex(db *SingleDB, command redis.Command) *protocol.Reply {
+	args := command.Args()
+	if len(args) != 2 {
+		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("LINDEX"))
+	}
+	key := string(args[0])
+	// check index arg
+	index, err := strconv.Atoi(string(args[1]))
+	if err != nil {
+		return protocol.NewErrorReply(protocol.ValueNotIntegerOrOutOfRangeError)
+	}
+	// get linked list data structure
+	v, exists := db.data.Get(key)
+	if !exists {
+		return protocol.NilReply
+	}
+	entry := v.(*Entry)
+	// check if entry is linked list
+	if !isLinkedList(entry) {
+		return protocol.NewErrorReply(protocol.WrongTypeOperationError)
+	}
+	linkedList := entry.Data.(*list.LinkedList)
+	// set index to positive value
+	if index < 0 {
+		index = linkedList.Size() + index
+	}
+	// out of range
+	if index >= linkedList.Size() {
+		return protocol.NewErrorReply(protocol.ValueNotIntegerOrOutOfRangeError)
+	}
+	return protocol.NewBulkValueReply(linkedList.Get(index))
+}
+
+func isLinkedList(entry *Entry) bool {
+	return reflect.TypeOf(entry.Data).String() == "*list.LinkedList"
 }
