@@ -6,6 +6,7 @@ import (
 	"redigo/redis"
 	"redigo/redis/protocol"
 	"reflect"
+	"strconv"
 )
 
 func init() {
@@ -13,6 +14,7 @@ func init() {
 	RegisterCommandExecutor("lpop", execLPop)
 	RegisterCommandExecutor("rpush", execRPush)
 	RegisterCommandExecutor("rpop", execRPop)
+	RegisterCommandExecutor("lrange", execLRange)
 }
 
 func execLPush(db *SingleDB, command redis.Command) *protocol.Reply {
@@ -110,4 +112,39 @@ func execRPop(db *SingleDB, command redis.Command) *protocol.Reply {
 		}
 	}
 	return protocol.NilReply
+}
+
+func execLRange(db *SingleDB, command redis.Command) *protocol.Reply {
+	args := command.Args()
+	if len(args) != 3 {
+		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("lrange"))
+	}
+	key := string(args[0])
+	// parse start index and end index
+	start, err1 := strconv.Atoi(string(args[1]))
+	end, err2 := strconv.Atoi(string(args[2]))
+	if err1 != nil || err2 != nil {
+		return protocol.NewErrorReply(protocol.ValueNotIntegerOrOutOfRangeError)
+	}
+
+	v, exists := db.data.Get(key)
+	if !exists {
+		return protocol.EmptyListReply
+	}
+	entry := v.(*Entry)
+	// check key dataStructure
+	if reflect.TypeOf(entry.Data).String() != "*list.LinkedList" {
+		return protocol.NewErrorReply(protocol.WrongTypeOperationError)
+	}
+	linkedList := entry.Data.(*list.LinkedList)
+	if start < 0 {
+		start = linkedList.Size() + start
+	}
+	if end < 0 {
+		end = linkedList.Size() + end
+	}
+	if result := linkedList.LeftRange(start, end); result != nil {
+		return protocol.NewArrayReply(result)
+	}
+	return protocol.EmptyListReply
 }
