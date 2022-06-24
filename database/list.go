@@ -15,6 +15,8 @@ func init() {
 	RegisterCommandExecutor("rpop", execRPop)
 	RegisterCommandExecutor("lrange", execLRange)
 	RegisterCommandExecutor("lindex", execLIndex)
+	RegisterCommandExecutor("llen", execLLen)
+	RegisterCommandExecutor("rpoplpush", execRPopLPush)
 }
 
 func execLPush(db *SingleDB, command redis.Command) *protocol.Reply {
@@ -181,6 +183,63 @@ func execLIndex(db *SingleDB, command redis.Command) *protocol.Reply {
 		return protocol.NewErrorReply(protocol.ValueNotIntegerOrOutOfRangeError)
 	}
 	return protocol.NewBulkValueReply(linkedList.Get(index))
+}
+
+func execLLen(db *SingleDB, command redis.Command) *protocol.Reply {
+	args := command.Args()
+	if len(args) != 1 {
+		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("LLEN"))
+	}
+	key := string(args[0])
+	v, exists := db.data.Get(key)
+	if !exists {
+		return protocol.NewNumberReply(0)
+	}
+	entry := v.(*Entry)
+	if !isLinkedList(entry) {
+		return protocol.NewErrorReply(protocol.WrongTypeOperationError)
+	}
+	linkedList := entry.Data.(*list.LinkedList)
+	return protocol.NewNumberReply(linkedList.Size())
+}
+
+func execRPopLPush(db *SingleDB, command redis.Command) *protocol.Reply {
+	args := command.Args()
+	if len(args) != 2 {
+		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("RPopLPush"))
+	}
+	source := string(args[0])
+	dest := string(args[1])
+	v1, exists1 := db.data.Get(source)
+	// check if source exists
+	if !exists1 {
+		return protocol.NilReply
+	}
+	v2, exists2 := db.data.Get(dest)
+	// create dest if not exist
+	var entry2 *Entry
+	if !exists2 {
+		entry2 = &Entry{Data: list.NewLinkedList()}
+		db.data.Put(dest, entry2)
+	} else {
+		entry2 = v2.(*Entry)
+	}
+	entry1 := v1.(*Entry)
+	// check if source and dest are linked list struct
+	if !isLinkedList(entry1) || !isLinkedList(entry2) {
+		return protocol.NewErrorReply(protocol.WrongTypeOperationError)
+	}
+
+	srcList := entry1.Data.(*list.LinkedList)
+	destList := entry2.Data.(*list.LinkedList)
+	// if source list is empty, return a Nil reply
+	if srcList.Size() == 0 {
+		return protocol.NilReply
+	}
+	// pop src right element, put into dest left
+	element := srcList.RemoveRight()
+	destList.AddLeft(element)
+	return protocol.NewBulkValueReply(element)
 }
 
 func isLinkedList(entry *Entry) bool {
