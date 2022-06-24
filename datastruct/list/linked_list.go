@@ -91,16 +91,33 @@ func (l *LinkedList) RemoveLeft() []byte {
 		l.size--
 		return val
 	}
-	if l.left != nil {
-		next := l.left.next
-		left := l.left
-		next.prev = nil
-		left.next = nil
-		l.left = next
-		l.size--
-		return left.value
+	next := l.left.next
+	left := l.left
+	next.prev = nil
+	left.next = nil
+	l.left = next
+	l.size--
+	return left.value
+}
+
+func (l *LinkedList) RemoveRight() []byte {
+	if l.right == nil {
+		return nil
 	}
-	return nil
+	if l.left == l.right {
+		val := l.right
+		l.right = nil
+		l.left = nil
+		l.size--
+		return val.value
+	}
+	right := l.right
+	prev := l.right.prev
+	right.prev = nil
+	prev.next = nil
+	l.right = prev
+	l.size--
+	return right.value
 }
 
 func NewLinkedList(vals ...[]byte) *LinkedList {
