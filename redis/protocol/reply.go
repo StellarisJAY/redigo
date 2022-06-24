@@ -6,8 +6,9 @@ import (
 )
 
 var (
-	OKReply  = &Reply{singleStr: "OK"}
-	NilReply = &Reply{singleStr: "(nil)"}
+	OKReply        = &Reply{singleStr: "OK"}
+	NilReply       = &Reply{singleStr: "(nil)"}
+	EmptyListReply = &Reply{bulkStringArray: [][]byte{}}
 )
 
 type Reply struct {
@@ -92,7 +93,9 @@ func (r *Reply) ToBytes() []byte {
 	if r.singleStr != "" {
 		return []byte("+" + r.singleStr + CRLF)
 	} else if r.bulkStringArray != nil {
-		if len(r.bulkStringArray) == 1 {
+		if len(r.bulkStringArray) == 0 {
+			return []byte("*0" + CRLF)
+		} else if len(r.bulkStringArray) == 1 {
 			return []byte("+" + string(r.bulkStringArray[0]) + CRLF)
 		} else {
 			builder := strings.Builder{}
