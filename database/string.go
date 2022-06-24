@@ -78,6 +78,9 @@ func executeSet(db *SingleDB, command redis.Command) *protocol.Reply {
 	// set ttl
 	if expireTime != infiniteExpireTime {
 		db.Expire(key, delay)
+	} else {
+		// cancel old ttl
+		db.CancelTTL(key)
 	}
 	if result == 0 {
 		return protocol.NilReply
@@ -116,6 +119,9 @@ func executeSetNX(db *SingleDB, command redis.Command) *protocol.Reply {
 	value := args[1]
 	entry := &Entry{Data: value}
 	exists := db.data.PutIfAbsent(key, entry)
+	if exists != 0 {
+		db.CancelTTL(key)
+	}
 	return protocol.NewNumberReply(exists)
 }
 
@@ -130,6 +136,11 @@ func executeAppend(db *SingleDB, command redis.Command) *protocol.Reply {
 	var length int
 	if exists {
 		entry := v.(*Entry)
+		// check if entry is string type
+		if reflect.TypeOf(entry.Data).String() != "[]uint8" {
+			return protocol.NewErrorReply(protocol.WrongTypeOperationError)
+		}
+		// append new value to original string
 		originalValue := entry.Data.([]byte)
 		value := make([]byte, len(originalValue)+len(appendValue))
 		copy(value[0:len(originalValue)], originalValue)
@@ -138,6 +149,7 @@ func executeAppend(db *SingleDB, command redis.Command) *protocol.Reply {
 		_ = db.data.Put(key, entry)
 		length = len(value)
 	} else {
+		// key doesn't exist.
 		entry := &Entry{Data: appendValue}
 		_ = db.data.Put(key, entry)
 		length = len(appendValue)
@@ -196,6 +208,10 @@ func add(db *SingleDB, key string, delta int) *protocol.Reply {
 	v, exists := db.data.Get(key)
 	if exists {
 		entry := v.(*Entry)
+		// check entry type
+		if reflect.TypeOf(entry.Data).String() != "[]uint8" {
+			return protocol.NewErrorReply(protocol.WrongTypeOperationError)
+		}
 		s := string(entry.Data.([]byte))
 		if val, err := strconv.Atoi(s); err != nil {
 			return protocol.NewErrorReply(protocol.HashValueNotIntegerError)
