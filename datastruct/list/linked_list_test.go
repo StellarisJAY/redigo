@@ -1,6 +1,9 @@
 package list
 
-import "testing"
+import (
+	"strconv"
+	"testing"
+)
 
 func TestLinkedList_AddLeft(t *testing.T) {
 	list := NewLinkedList()
@@ -72,6 +75,33 @@ func TestLinkedList_RemoveRight(t *testing.T) {
 		t.Fail()
 	}
 	if list.Left() != nil || list.Right() != nil || list.Size() != 0 {
+		t.Fail()
+	}
+}
+
+func TestLinkedList_LeftRange(t *testing.T) {
+	list := NewLinkedList()
+	list.AddRight([]byte("1"))
+	list.AddRight([]byte("2"))
+	list.AddRight([]byte("3"))
+	list.AddRight([]byte("4"))
+	list.AddRight([]byte("5"))
+	list.AddRight([]byte("6"))
+
+	arr := list.LeftRange(0, list.Size()-1)
+	for i, value := range arr {
+		if num, err := strconv.Atoi(string(value)); err != nil || num != i+1 {
+			t.Fail()
+		}
+	}
+
+	arr = list.LeftRange(5, 6)
+	if len(arr) != 1 || string(arr[0]) != "6" {
+		t.Fail()
+	}
+
+	arr = list.LeftRange(10, 100)
+	if arr != nil {
 		t.Fail()
 	}
 }
