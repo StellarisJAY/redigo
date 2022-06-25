@@ -8,7 +8,7 @@ import (
 var (
 	OKReply        = &Reply{singleStr: "OK"}
 	NilReply       = &Reply{singleStr: "(nil)"}
-	EmptyListReply = &Reply{bulkStringArray: [][]byte{}}
+	EmptyListReply = &Reply{nilReply: true}
 )
 
 type Reply struct {
@@ -16,10 +16,11 @@ type Reply struct {
 	number          int
 	bulkStringArray [][]byte
 	singleStr       string
+	nilReply        bool
 }
 
 func NewNumberReply(number int) *Reply {
-	return &Reply{number: number}
+	return &Reply{number: number, nilReply: false}
 }
 
 func NewBulkValueReply(value []byte) *Reply {
@@ -30,6 +31,7 @@ func NewBulkValueReply(value []byte) *Reply {
 		number:          -1,
 		bulkStringArray: arr,
 		singleStr:       "",
+		nilReply:        false,
 	}
 }
 
@@ -42,6 +44,7 @@ func NewBulkStringReply(value string) *Reply {
 		number:          -1,
 		bulkStringArray: arr,
 		singleStr:       "",
+		nilReply:        false,
 	}
 }
 
@@ -52,6 +55,7 @@ func NewSingleStringReply(value string) *Reply {
 		number:          -1,
 		bulkStringArray: nil,
 		singleStr:       value,
+		nilReply:        false,
 	}
 }
 
@@ -61,6 +65,7 @@ func NewArrayReply(arr [][]byte) *Reply {
 		number:          -1,
 		bulkStringArray: arr,
 		singleStr:       "",
+		nilReply:        false,
 	}
 }
 
@@ -74,6 +79,7 @@ func NewStringArrayReply(arr []string) *Reply {
 		number:          -1,
 		bulkStringArray: bulkArr,
 		singleStr:       "",
+		nilReply:        false,
 	}
 }
 
@@ -83,6 +89,7 @@ func NewErrorReply(err error) *Reply {
 		number:          -1,
 		bulkStringArray: nil,
 		singleStr:       "",
+		nilReply:        false,
 	}
 }
 
@@ -90,6 +97,9 @@ func NewErrorReply(err error) *Reply {
 	Format Reply to RESP bytes
 */
 func (r *Reply) ToBytes() []byte {
+	if r.nilReply {
+		return []byte("$-1" + CRLF)
+	}
 	if r.singleStr != "" {
 		return []byte("+" + r.singleStr + CRLF)
 	} else if r.bulkStringArray != nil {
@@ -102,11 +112,16 @@ func (r *Reply) ToBytes() []byte {
 			// * length
 			builder.WriteString("*" + strconv.Itoa(len(r.bulkStringArray)) + CRLF)
 			for _, bulk := range r.bulkStringArray {
+				if bulk == nil {
+					builder.WriteString("$-1" + CRLF)
+					continue
+				}
 				// Write $(len)\r\n{string}\r\n
 				builder.WriteString("$" + strconv.Itoa(len(bulk)) + CRLF)
 				builder.Write(bulk)
 				builder.WriteString(CRLF)
 			}
+			r.bulkStringArray = nil
 			return []byte(builder.String())
 		}
 	} else if r.err != nil {
