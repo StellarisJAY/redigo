@@ -7,7 +7,6 @@ import (
 	"redigo/redis"
 	"redigo/redis/protocol"
 	"redigo/util/timewheel"
-	"strings"
 	"time"
 )
 
@@ -34,7 +33,9 @@ func (db *SingleDB) ExecuteLoop() error {
 		// wait for command
 		cmd := <-db.commandChan
 		// execute command
-		db.execute(cmd)
+		reply := db.Execute(cmd)
+		// send reply
+		cmd.Connection().SendReply(reply)
 	}
 }
 
@@ -47,22 +48,16 @@ func (db *SingleDB) SubmitCommand(command redis.Command) {
 	Execute a command
 	Finds the executor in executor map, then call execFunc to handle it
 */
-func (db *SingleDB) execute(command redis.Command) {
-	cmd := strings.ToLower(command.Get(0))
-	conn := command.Connection()
-	if cmd == "command" {
-		conn.SendReply(protocol.OKReply)
-		return
-	}
-	// loop for command executor
+func (db *SingleDB) Execute(command redis.Command) *protocol.Reply {
+	cmd := command.Name()
 	exec, exists := executors[cmd]
 	if exists {
 		reply := exec.execFunc(db, command)
-		conn.SendReply(reply)
+		return reply
 	} else {
 		log.Println("Unknown command: ", cmd)
 		// command executor doesn't exist, send unknown command to client
-		conn.SendReply(protocol.NewErrorReply(protocol.CreateUnknownCommandError(cmd)))
+		return protocol.NewErrorReply(protocol.CreateUnknownCommandError(cmd))
 	}
 }
 
