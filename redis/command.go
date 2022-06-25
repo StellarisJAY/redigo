@@ -1,6 +1,9 @@
 package redis
 
-import "redigo/interface/tcp"
+import (
+	"redigo/interface/tcp"
+	"strings"
+)
 
 type Command struct {
 	Parts [][]byte
@@ -33,4 +36,8 @@ func (c *Command) BindConnection(conn tcp.Connection) {
 
 func (c Command) Connection() tcp.Connection {
 	return c.conn
+}
+
+func (c Command) Name() string {
+	return strings.ToLower(string(c.Parts[0]))
 }
