@@ -71,3 +71,14 @@ func (s *SimpleDict) Clear() {
 func (s *SimpleDict) Len() int {
 	return len(s.store)
 }
+
+func (s *SimpleDict) RandomKeys(count int) []string {
+	keys := make([]string, count)
+	for i := 0; i < count; i++ {
+		for key := range s.store {
+			keys[i] = key
+			break
+		}
+	}
+	return keys
+}

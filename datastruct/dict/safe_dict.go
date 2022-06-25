@@ -77,3 +77,12 @@ func (dict *SafeDict) Len() int {
 	//TODO implement me
 	panic("implement me")
 }
+func (dict *SafeDict) RandomKey() string {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (dict *SafeDict) RandomKeys(count int) []string {
+	//TODO implement me
+	panic("implement me")
+}
