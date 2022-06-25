@@ -11,21 +11,23 @@ import (
 )
 
 type Connection struct {
-	Conn      net.Conn
-	ReplyChan chan *protocol.Reply
-	db        database.DB
-	ctx       context.Context
-	cancel    context.CancelFunc
+	Conn       net.Conn
+	ReplyChan  chan *protocol.Reply
+	db         database.DB
+	ctx        context.Context
+	cancel     context.CancelFunc
+	selectedDB int
 }
 
 func NewConnection(conn net.Conn, db database.DB) *Connection {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Connection{
-		Conn:      conn,
-		ReplyChan: make(chan *protocol.Reply, 1024),
-		db:        db,
-		cancel:    cancel,
-		ctx:       ctx,
+		Conn:       conn,
+		ReplyChan:  make(chan *protocol.Reply, 1024),
+		db:         db,
+		cancel:     cancel,
+		ctx:        ctx,
+		selectedDB: 0,
 	}
 }
 
@@ -80,4 +82,12 @@ func (c *Connection) Close() {
 
 func (c *Connection) SendReply(reply *protocol.Reply) {
 	c.ReplyChan <- reply
+}
+
+func (c *Connection) SelectDB(index int) {
+	c.selectedDB = index
+}
+
+func (c *Connection) DBIndex() int {
+	return c.selectedDB
 }

@@ -7,4 +7,7 @@ type Connection interface {
 	WriteLoop() error
 	Close()
 	SendReply(*protocol.Reply)
+
+	SelectDB(index int)
+	DBIndex() int
 }
