@@ -82,3 +82,19 @@ func (s *SimpleDict) RandomKeys(count int) []string {
 	}
 	return keys
 }
+
+func (s *SimpleDict) RandomKeysDistinct(count int) (result []string) {
+	if count > s.Len() {
+		count = s.Len()
+	}
+	result = make([]string, count)
+	i := 0
+	for key, _ := range s.store {
+		if i == count {
+			break
+		}
+		result[i] = key
+		i++
+	}
+	return
+}

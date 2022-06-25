@@ -14,4 +14,5 @@ type Dict interface {
 	Clear()
 	Len() int
 	RandomKeys(int) []string
+	RandomKeysDistinct(int) []string
 }

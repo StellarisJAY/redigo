@@ -86,3 +86,7 @@ func (dict *SafeDict) RandomKeys(count int) []string {
 	//TODO implement me
 	panic("implement me")
 }
+
+func (dict *SafeDict) RandomKeysDistinct(count int) []string {
+	return nil
+}
