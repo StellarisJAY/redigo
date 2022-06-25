@@ -8,7 +8,7 @@ import (
 var (
 	OKReply        = &Reply{singleStr: "OK"}
 	NilReply       = &Reply{singleStr: "(nil)"}
-	EmptyListReply = &Reply{nilReply: true}
+	EmptyListReply = &Reply{nilReply: false, bulkStringArray: [][]byte{}}
 )
 
 type Reply struct {
