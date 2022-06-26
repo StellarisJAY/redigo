@@ -4,7 +4,6 @@ import (
 	"log"
 	"redigo/redis"
 	"redigo/redis/protocol"
-	"reflect"
 	"strconv"
 	"time"
 )
@@ -98,7 +97,7 @@ func executeGet(db *SingleDB, command redis.Command) *protocol.Reply {
 	v, exists := db.data.Get(key)
 	if exists {
 		entry := v.(*Entry)
-		if reflect.TypeOf(entry.Data).String() == "[]uint8" {
+		if isSet(*entry) {
 			value := entry.Data.([]byte)
 			return protocol.NewBulkValueReply(value)
 		} else {
@@ -137,7 +136,7 @@ func executeAppend(db *SingleDB, command redis.Command) *protocol.Reply {
 	if exists {
 		entry := v.(*Entry)
 		// check if entry is string type
-		if reflect.TypeOf(entry.Data).String() != "[]uint8" {
+		if !isString(*entry) {
 			return protocol.NewErrorReply(protocol.WrongTypeOperationError)
 		}
 		// append new value to original string
@@ -209,7 +208,7 @@ func add(db *SingleDB, key string, delta int) *protocol.Reply {
 	if exists {
 		entry := v.(*Entry)
 		// check entry type
-		if reflect.TypeOf(entry.Data).String() != "[]uint8" {
+		if !isString(*entry) {
 			return protocol.NewErrorReply(protocol.WrongTypeOperationError)
 		}
 		s := string(entry.Data.([]byte))
@@ -227,4 +226,12 @@ func add(db *SingleDB, key string, delta int) *protocol.Reply {
 		db.data.Put(key, entry)
 		return protocol.NewNumberReply(delta)
 	}
+}
+
+func isString(entry Entry) bool {
+	switch entry.Data.(type) {
+	case []byte:
+		return true
+	}
+	return false
 }
