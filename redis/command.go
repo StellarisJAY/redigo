@@ -10,8 +10,12 @@ type Command struct {
 	conn  tcp.Connection
 }
 
-func NewCommand() *Command {
-	return &Command{Parts: make([][]byte, 0, 1)}
+func NewEmptyCommand() *Command {
+	return &Command{}
+}
+
+func NewBulkStringCommand(bulk []byte) *Command {
+	return &Command{Parts: [][]byte{bulk}}
 }
 
 func (c *Command) Append(part []byte) {

@@ -28,12 +28,12 @@ func Parse(reader *bufio.Reader) (*redis.Command, error) {
 	}
 	// RESP Array type
 	if msg[0] == '*' {
-		cmd := redis.NewCommand()
 		// get Array size
 		size, err := strconv.Atoi(string(msg[1 : len(msg)-2]))
 		if err != nil {
 			return nil, err
 		}
+		cmd := redis.NewEmptyCommand()
 		// parse RESP array
 		if err = readArray(reader, size, cmd); err != nil {
 			return nil, err
@@ -45,8 +45,7 @@ func Parse(reader *bufio.Reader) (*redis.Command, error) {
 		if err != nil {
 			return nil, err
 		}
-		cmd := redis.NewCommand()
-		cmd.Append(bulk)
+		cmd := redis.NewBulkStringCommand(bulk)
 		return cmd, nil
 	} else {
 		return nil, nil
@@ -77,6 +76,7 @@ func readBulkString(reader io.Reader, lengthStr []byte) ([]byte, error) {
 }
 
 func readArray(reader *bufio.Reader, size int, cmd *redis.Command) error {
+	parts := make([][]byte, size)
 	for i := 0; i < size; i++ {
 		// read a line
 		msg, ioErr, err := readLine(reader)
@@ -91,12 +91,12 @@ func readArray(reader *bufio.Reader, size int, cmd *redis.Command) error {
 			if err != nil {
 				return err
 			}
-			cmd.Append(bulk)
+			parts[i] = bulk
 		} else if msg[0] == ':' {
 			// read RESP number
-
 		}
 	}
+	cmd.Parts = parts
 	return nil
 }
 
