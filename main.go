@@ -21,7 +21,7 @@ func init() {
 
 func main() {
 	fmt.Println(banner)
-	db := database.NewMultiDB(15, 102400)
+	db := database.NewMultiDB(16, 1024)
 	server := tcp.NewServer(":6380", db)
 	err := server.Start()
 	if err != nil {
