@@ -1,6 +1,7 @@
 package database
 
 import (
+	"errors"
 	"log"
 	"redigo/datastruct/dict"
 	"redigo/datastruct/lock"
@@ -11,37 +12,27 @@ import (
 )
 
 type SingleDB struct {
-	data        dict.Dict
-	ttlMap      dict.Dict
-	lock        *lock.Locker
-	idx         int
-	commandChan chan redis.Command
+	data   dict.Dict
+	ttlMap dict.Dict
+	lock   *lock.Locker
+	idx    int
 }
 
-func NewSingleDB(idx int, commandChanSize int) *SingleDB {
+func NewSingleDB(idx int) *SingleDB {
 	return &SingleDB{
-		data:        dict.NewSimpleDict(),
-		ttlMap:      dict.NewSimpleDict(),
-		lock:        lock.NewLock(1024),
-		idx:         idx,
-		commandChan: make(chan redis.Command, commandChanSize),
+		data:   dict.NewSimpleDict(),
+		ttlMap: dict.NewSimpleDict(),
+		lock:   lock.NewLock(1024),
+		idx:    idx,
 	}
 }
 
 func (db *SingleDB) ExecuteLoop() error {
-	for {
-		// wait for command
-		cmd := <-db.commandChan
-		// execute command
-		reply := db.Execute(cmd)
-		// send reply
-		cmd.Connection().SendReply(reply)
-	}
+	panic(errors.New("unsupported operation"))
 }
 
 func (db *SingleDB) SubmitCommand(command redis.Command) {
-	// submit a command to command channel
-	db.commandChan <- command
+	panic(errors.New("unsupported operation"))
 }
 
 /*
@@ -55,7 +46,6 @@ func (db *SingleDB) Execute(command redis.Command) *protocol.Reply {
 		reply := exec.execFunc(db, command)
 		return reply
 	} else {
-		log.Println("Unknown command: ", cmd)
 		// command executor doesn't exist, send unknown command to client
 		return protocol.NewErrorReply(protocol.CreateUnknownCommandError(cmd))
 	}

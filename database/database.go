@@ -26,14 +26,7 @@ func NewMultiDB(dbSize, cmdChanSize int) *MultiDB {
 	}
 	// initialize single databases in db set
 	for i := 0; i < dbSize; i++ {
-		db.dbSet[i] = NewSingleDB(i, cmdChanSize)
-		// start single database's execute loop
-		go func(idx int) {
-			err := db.dbSet[idx].ExecuteLoop()
-			if err != nil {
-				panic(err)
-			}
-		}(i)
+		db.dbSet[i] = NewSingleDB(i)
 	}
 	return db
 }
