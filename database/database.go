@@ -53,9 +53,7 @@ func (m *MultiDB) ExecuteLoop() error {
 		cmd := <-m.cmdChan
 		// execute command and get a reply if command is not dispatched to single database
 		reply := m.Execute(cmd)
-		if reply != nil {
-			cmd.Connection().SendReply(reply)
-		}
+		cmd.Connection().SendReply(reply)
 	}
 }
 
@@ -70,8 +68,7 @@ func (m *MultiDB) Execute(command redis.Command) *protocol.Reply {
 		// dispatch command to a single database
 		index := command.Connection().DBIndex()
 		// submit command to target database, target database will send reply
-		m.dbSet[index].SubmitCommand(command)
-		return nil
+		return m.dbSet[index].Execute(command)
 	}
 }
 
