@@ -51,3 +51,20 @@ func (zs *SortedSet) Rank(member string) int64 {
 	}
 	return zs.skl.Rank(n.Member, n.Score)
 }
+
+func (zs *SortedSet) PopMax() *Element {
+	if n := zs.skl.PopMax(); n != nil {
+		return &n.Element
+	}
+	return nil
+}
+func (zs *SortedSet) PopMin() *Element {
+	if n := zs.skl.PopMin(); n != nil {
+		return &n.Element
+	}
+	return nil
+}
+
+func (zs *SortedSet) Size() int {
+	return len(zs.dict)
+}

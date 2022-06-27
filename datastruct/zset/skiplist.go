@@ -189,7 +189,9 @@ func (skl *skipList) Rank(member string, score float64) int64 {
 	var rank int64 = 0
 	n := skl.head
 	for i := skl.level - 1; i >= 0; i-- {
-		for n.level[i].forward != nil && (n.level[i].forward.Score < score || (n.level[i].forward.Score == score && n.level[i].forward.Member < member)) {
+		for n.level[i].forward != nil &&
+			(n.level[i].forward.Score < score ||
+				(n.level[i].forward.Score == score && n.level[i].forward.Member < member)) {
 			rank += n.level[i].span
 			n = n.level[i].forward
 		}
@@ -203,6 +205,24 @@ func (skl *skipList) Rank(member string, score float64) int64 {
 		n = n.level[0].forward
 	}
 	return rank
+}
+
+func (skl *skipList) PopMax() *node {
+	if skl.tail != nil {
+		rem := skl.tail
+		skl.Remove(rem.Member, rem.Score)
+		return rem
+	}
+	return nil
+}
+
+func (skl *skipList) PopMin() *node {
+	if skl.head.level[0].forward != nil {
+		rem := skl.head.level[0].forward
+		skl.Remove(rem.Member, rem.Score)
+		return rem
+	}
+	return nil
 }
 
 func (skl *skipList) PrintList() {
