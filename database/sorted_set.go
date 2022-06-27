@@ -12,6 +12,8 @@ func init() {
 	RegisterCommandExecutor("zscore", execZScore)
 	RegisterCommandExecutor("zrem", execZRem)
 	RegisterCommandExecutor("zrank", execZRank)
+	RegisterCommandExecutor("zpopmin", execPopMin)
+	RegisterCommandExecutor("zpopmax", execPopMax)
 }
 
 func execZAdd(db *SingleDB, command redis.Command) *protocol.Reply {
@@ -91,13 +93,82 @@ func execZRank(db *SingleDB, command redis.Command) *protocol.Reply {
 	if err != nil {
 		return protocol.NewErrorReply(err)
 	}
-	if zs == nil {
-		return protocol.NilReply
-	}
-	if rank := zs.Rank(string(args[1])); rank != -1 {
-		return protocol.NewNumberReply(int(rank))
+	if zs != nil {
+		if rank := zs.Rank(string(args[1])); rank != -1 {
+			return protocol.NewNumberReply(int(rank))
+		}
 	}
 	return protocol.NilReply
+}
+
+func execPopMax(db *SingleDB, command redis.Command) *protocol.Reply {
+	args := command.Args()
+	if len(args) < 1 {
+		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("ZPOPMAX"))
+	}
+	count := 1
+	if len(args) > 1 {
+		n, err := strconv.Atoi(string(args[1]))
+		if err != nil {
+			return protocol.NewErrorReply(err)
+		}
+		count = n
+	}
+	zs, err := getSortedSet(db, string(args[0]))
+	if err != nil {
+		return protocol.NewErrorReply(err)
+	}
+	if zs != nil && zs.Size() != 0 {
+		if zs.Size() < count {
+			count = zs.Size()
+		}
+		result := make([]string, 2*count)
+		j := 0
+		for i := 0; i < count; i++ {
+			if max := zs.PopMax(); max != nil {
+				result[j] = max.Member
+				result[j+1] = strconv.FormatFloat(max.Score, 'f', -1, 64)
+				j += 2
+			}
+		}
+		return protocol.NewStringArrayReply(result)
+	}
+	return protocol.EmptyListReply
+}
+
+func execPopMin(db *SingleDB, command redis.Command) *protocol.Reply {
+	args := command.Args()
+	if len(args) < 1 {
+		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("ZPOPMIN"))
+	}
+	count := 1
+	if len(args) > 1 {
+		n, err := strconv.Atoi(string(args[1]))
+		if err != nil {
+			return protocol.NewErrorReply(err)
+		}
+		count = n
+	}
+	zs, err := getSortedSet(db, string(args[0]))
+	if err != nil {
+		return protocol.NewErrorReply(err)
+	}
+	if zs != nil && zs.Size() != 0 {
+		if zs.Size() < count {
+			count = zs.Size()
+		}
+		result := make([]string, 2*count)
+		j := 0
+		for i := 0; i < count; i++ {
+			if min := zs.PopMin(); min != nil {
+				result[j] = min.Member
+				result[j+1] = strconv.FormatFloat(min.Score, 'f', -1, 64)
+				j += 2
+			}
+		}
+		return protocol.NewStringArrayReply(result)
+	}
+	return protocol.EmptyListReply
 }
 
 func isSortedSet(entry Entry) bool {
