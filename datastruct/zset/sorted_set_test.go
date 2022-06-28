@@ -1,6 +1,7 @@
 package zset
 
 import (
+	"fmt"
 	"strconv"
 	"testing"
 )
@@ -47,4 +48,27 @@ func TestSortedSet_PopMin(t *testing.T) {
 			t.Fail()
 		}
 	}
+}
+
+func TestSortedSet_Range(t *testing.T) {
+	set := initTest(100)
+	elements := set.Range(0, -1)
+	if len(elements) != 100 || elements[0].Member != "1" || elements[99].Member != "100" {
+		t.Fail()
+	} else {
+		t.Log("Range 0 ~ -1 PASSED")
+	}
+	elements = set.Range(-10, -1)
+	if len(elements) != 10 || elements[0].Member != "91" || elements[9].Member != "100" {
+		t.Fail()
+	} else {
+		t.Log("Range -10 ~ -1 PASSED")
+	}
+	elements = set.Range(10, 20)
+	if len(elements) != 11 || elements[0].Member != "11" || elements[9].Member != "20" {
+		t.Fail()
+	} else {
+		t.Log("Range 10 ~ 20 PASSED")
+	}
+	fmt.Println()
 }
