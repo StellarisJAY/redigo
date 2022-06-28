@@ -70,5 +70,11 @@ func TestSortedSet_Range(t *testing.T) {
 	} else {
 		t.Log("Range 10 ~ 20 PASSED")
 	}
+	elements = set.Range(5, 3)
+	if elements != nil {
+		t.Fail()
+	} else {
+		t.Log("Range start > end PASSED")
+	}
 	fmt.Println()
 }
