@@ -225,6 +225,33 @@ func (skl *skipList) PopMin() *node {
 	return nil
 }
 
+func (skl *skipList) Range(start, end int) []Element {
+	node := skl.head
+	// 起始位置的rank值，加一跳过head
+	startRank := start + 1
+	count := end - start + 1
+	// 从顶层开始遍历
+	for i := skl.level - 1; i >= 0; i-- {
+		// 每层遍历跨度不超过start位置的节点
+		for node.level[i].forward != nil && int(node.level[i].span) <= startRank {
+			startRank -= int(node.level[i].span)
+			node = node.level[i].forward
+		}
+	}
+	// 在第0层遍历，直到start位置
+	for node.level[0].forward != nil && startRank > 0 {
+		startRank--
+		node = node.level[0].forward
+	}
+	// 从start位置遍历到end位置
+	result := make([]Element, count)
+	for i := 0; i < count && node != nil; i++ {
+		result[i] = node.Element
+		node = node.level[0].forward
+	}
+	return result
+}
+
 func (skl *skipList) PrintList() {
 	for i := skl.level - 1; i >= 0; i-- {
 		for n := skl.head; n != nil; n = n.level[i].forward {

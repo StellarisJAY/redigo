@@ -68,3 +68,16 @@ func (zs *SortedSet) PopMin() *Element {
 func (zs *SortedSet) Size() int {
 	return len(zs.dict)
 }
+
+func (zs *SortedSet) Range(start, end int) []Element {
+	if start < 0 {
+		start = zs.Size() + start
+	}
+	if end < 0 {
+		end = zs.Size() + end
+	}
+	if start > end {
+		return nil
+	}
+	return zs.skl.Range(start, end)
+}
