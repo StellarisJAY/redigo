@@ -78,3 +78,22 @@ func TestSortedSet_Range(t *testing.T) {
 	}
 	fmt.Println()
 }
+
+func TestSortedSet_CountBetween(t *testing.T) {
+	set := initTest(100)
+	count := set.CountBetween(0, 100)
+	if count != 100 {
+		t.Log("Count between 0 and 100 failed, count: ", count)
+		t.Fail()
+	}
+	count = set.CountBetween(10.5, 20)
+	if count != 10 {
+		t.Log("Count between 10.5 and 20 failed, count: ", count)
+		t.Fail()
+	}
+	count = set.CountBetween(90.5, 105)
+	if count != 10 {
+		t.Log("Count between 90.5 and 105 failed, count: ", count)
+		t.Fail()
+	}
+}
