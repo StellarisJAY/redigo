@@ -252,6 +252,30 @@ func (skl *skipList) Range(start, end int) []Element {
 	return result
 }
 
+func (skl *skipList) CountBetween(min, max float64) int {
+	node := skl.head
+	// 从顶层开始遍历
+	for i := skl.level - 1; i >= 0; i-- {
+		// 每层遍历直到下一个节点的score大于min
+		for node.level[i].forward != nil && node.level[i].forward.Score <= min {
+			node = node.level[i].forward
+		}
+	}
+	// 在第0层继续遍历，找到大于等于min的节点
+	for node != nil && node.Score < min {
+		node = node.level[0].forward
+	}
+	// 找到第一个大于等于min的节点后，开始在第0层遍历小于等于max的节点
+	count := 0
+	for node != nil && node.Score <= max {
+		if node != skl.head {
+			count++
+		}
+		node = node.level[0].forward
+	}
+	return count
+}
+
 func (skl *skipList) PrintList() {
 	for i := skl.level - 1; i >= 0; i-- {
 		for n := skl.head; n != nil; n = n.level[i].forward {
