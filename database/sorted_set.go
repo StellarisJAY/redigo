@@ -1,10 +1,17 @@
 package database
 
 import (
+	"math"
 	"redigo/datastruct/zset"
 	"redigo/redis"
 	"redigo/redis/protocol"
 	"strconv"
+	"strings"
+)
+
+var (
+	negativeInfinity float64 = math.MinInt64
+	positiveInfinity         = math.MaxFloat64
 )
 
 func init() {
@@ -16,6 +23,7 @@ func init() {
 	RegisterCommandExecutor("zpopmax", execPopMax)
 	RegisterCommandExecutor("zcard", execZCard)
 	RegisterCommandExecutor("zrange", execZRange)
+	RegisterCommandExecutor("zrangebyscore", execZRangeByScore)
 }
 
 func execZAdd(db *SingleDB, command redis.Command) *protocol.Reply {
@@ -231,6 +239,91 @@ func execZRange(db *SingleDB, command redis.Command) *protocol.Reply {
 		return protocol.NewStringArrayReply(result)
 	}
 	return protocol.EmptyListReply
+}
+
+func execZRangeByScore(db *SingleDB, command redis.Command) *protocol.Reply {
+	args := command.Args()
+	if len(args) < 3 {
+		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("ZRANGEBYSCORE"))
+	}
+	// parse interval, get min,max value and open options
+	min, max, lOpen, rOpen, err := parseInterval(string(args[1]), string(args[2]))
+	if err != nil {
+		return protocol.NewErrorReply(protocol.ValueNotFloatError)
+	}
+	withScores := false
+	offset := 0
+	count := -1
+	if len(args) > 3 {
+		additions := args[3:]
+		for i := 0; i < len(additions); {
+			arg := string(additions[i])
+			if arg == "WITHSCORES" {
+				withScores = true
+				i++
+			} else if arg == "LIMIT" {
+				if i >= len(additions)-2 {
+					return protocol.NewErrorReply(protocol.SyntaxError)
+				}
+				offset, err = strconv.Atoi(string(additions[i+1]))
+				count, err = strconv.Atoi(string(additions[i+2]))
+				if err != nil {
+					return protocol.NewErrorReply(protocol.ValueNotIntegerOrOutOfRangeError)
+				}
+				i += 3
+			} else {
+				return protocol.NewErrorReply(protocol.SyntaxError)
+			}
+		}
+	}
+	set, err := getSortedSet(db, string(args[0]))
+	if err != nil {
+		return protocol.NewErrorReply(protocol.WrongTypeOperationError)
+	}
+	if count == -1 {
+		count = set.Size()
+	}
+	elements := set.RangeByScore(min, max, offset, count, lOpen, rOpen)
+	var result []string
+	if withScores {
+		result = make([]string, len(elements)*2)
+		i := 0
+		for _, e := range elements {
+			result[i] = e.Member
+			result[i+1] = strconv.FormatFloat(e.Score, 'f', -1, 64)
+			i += 2
+		}
+	} else {
+		result = make([]string, len(elements))
+		for i, e := range elements {
+			result[i] = e.Member
+		}
+	}
+	return protocol.NewStringArrayReply(result)
+}
+
+func parseInterval(arg1, arg2 string) (min, max float64, lOpen, rOpen bool, err error) {
+	if arg1 == "-inf" && arg2 == "+inf" {
+		min = negativeInfinity
+		max = positiveInfinity
+		return
+	} else if arg1 == "-inf" {
+		min = negativeInfinity
+	} else if arg2 == "+inf" {
+		max = positiveInfinity
+	}
+
+	if strings.HasPrefix(arg1, "(") {
+		lOpen = true
+		arg1 = strings.TrimPrefix(arg1, "(")
+	}
+	if strings.HasPrefix(arg2, "(") {
+		rOpen = true
+		arg2 = strings.TrimPrefix(arg2, "(")
+	}
+	min, err = strconv.ParseFloat(arg1, 64)
+	max, err = strconv.ParseFloat(arg2, 64)
+	return
 }
 
 func isSortedSet(entry Entry) bool {

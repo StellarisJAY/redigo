@@ -15,6 +15,7 @@ var (
 	InvalidDBIndexError              = errors.New("ERR invalid DB index")
 	DBIndexOutOfRangeError           = errors.New("ERR DB index is out of range")
 	ValueNotFloatError               = errors.New("ERR value is not a valid float")
+	SyntaxError                      = errors.New("ERR syntax error")
 )
 
 func CreateWrongArgumentNumberError(command string) error {
