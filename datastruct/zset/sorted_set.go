@@ -76,6 +76,10 @@ func (zs *SortedSet) Range(start, end int) []Element {
 	if end < 0 {
 		end = zs.Size() + end
 	}
+	// make sure start index not negative
+	if start < 0 {
+		start = 0
+	}
 	if start > end {
 		return nil
 	}
