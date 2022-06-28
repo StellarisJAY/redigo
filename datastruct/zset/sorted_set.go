@@ -86,9 +86,16 @@ func (zs *SortedSet) Range(start, end int) []Element {
 	return zs.skl.Range(start, end)
 }
 
-func (zs *SortedSet) CountBetween(min, max float64) int {
+func (zs *SortedSet) CountBetween(min, max float64, lOpen, rOpen bool) int {
 	if min > max {
 		return 0
 	}
-	return zs.skl.CountBetween(min, max)
+	return zs.skl.CountBetween(min, max, lOpen, rOpen)
+}
+
+func (zs *SortedSet) RangeByScore(min, max float64, offset, count int, lOpen, rOpen bool) []Element {
+	if min > max || count <= 0 {
+		return nil
+	}
+	return zs.skl.RangeByScore(min, max, offset, count, lOpen, rOpen)
 }
