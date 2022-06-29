@@ -97,7 +97,7 @@ func executeGet(db *SingleDB, command redis.Command) *protocol.Reply {
 	v, exists := db.data.Get(key)
 	if exists {
 		entry := v.(*Entry)
-		if isSet(*entry) {
+		if isString(*entry) {
 			value := entry.Data.([]byte)
 			return protocol.NewBulkValueReply(value)
 		} else {
