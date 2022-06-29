@@ -15,20 +15,30 @@ type Entry struct {
 	expireAt int64
 }
 type MultiDB struct {
-	dbSet   []database.DB
-	cmdChan chan redis.Command
+	dbSet     []database.DB
+	cmdChan   chan redis.Command
+	executors map[string]func(redis.Command) *protocol.Reply
 }
 
 func NewMultiDB(dbSize, cmdChanSize int) *MultiDB {
 	db := &MultiDB{
-		dbSet:   make([]database.DB, dbSize),
-		cmdChan: make(chan redis.Command, cmdChanSize),
+		dbSet:     make([]database.DB, dbSize),
+		cmdChan:   make(chan redis.Command, cmdChanSize),
+		executors: make(map[string]func(redis.Command) *protocol.Reply),
 	}
+	db.initCommandExecutors()
 	// initialize single databases in db set
 	for i := 0; i < dbSize; i++ {
 		db.dbSet[i] = NewSingleDB(i)
 	}
 	return db
+}
+
+func (m *MultiDB) initCommandExecutors() {
+	m.executors["command"] = func(command redis.Command) *protocol.Reply {
+		return protocol.OKReply
+	}
+	m.executors["select"] = m.execSelectDB
 }
 
 func (m *MultiDB) SubmitCommand(command redis.Command) {
@@ -52,11 +62,8 @@ func (m *MultiDB) ExecuteLoop() error {
 
 func (m *MultiDB) Execute(command redis.Command) *protocol.Reply {
 	cmdName := command.Name()
-	// select command, switches database
-	if cmdName == "select" {
-		return m.execSelectDB(command)
-	} else if cmdName == "command" {
-		return protocol.OKReply
+	if exec, ok := m.executors[cmdName]; ok {
+		return exec(command)
 	} else {
 		// dispatch command to a single database
 		index := command.Connection().DBIndex()
