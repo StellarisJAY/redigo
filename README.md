@@ -12,7 +12,7 @@ RediGO是用Go语言实现的Redis服务器。通过该项目学习Redis原理�
 - [ ] AOF持久化和AOF重写
 - [ ] 发布订阅功能
 - [ ] multi事务功能
-- [ ] 并发命令处理，避免如KEYS等命令阻塞导致其他命令阻塞
+- [ ] 并发命令处理，避免如KEYS等命令导致其他命令阻塞
 
 
 
@@ -28,6 +28,23 @@ RediGO是用Go语言实现的Redis服务器。通过该项目学习Redis原理�
 | 其他     | TTL, PTTL, EXPIRE, PERSIST, DEL, EXISTS, PING, TYPE, SELECT  |
 
 
+
+## 运行RediGO
+
+### 源码编译运行
+
+运行编译脚本，获得可执行文件
+
+```shell
+# linux系统
+./build-linux.sh
+# Windows系统
+./build-windos.bat
+```
+
+运行target目录下的可执行文件，使用 -p 指定使用的端口号（默认6380）
+
+![](https://images-1257369645.cos.ap-chengdu.myqcloud.com/redigo/redigo_start.PNG)
 
 ## 性能测试
 
