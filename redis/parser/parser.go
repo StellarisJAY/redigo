@@ -47,7 +47,17 @@ func Parse(reader *bufio.Reader) (*redis.Command, error) {
 		}
 		cmd := redis.NewBulkStringCommand(bulk)
 		return cmd, nil
+	} else if msg[0] == '+' {
+		cmdName := msg[1 : len(msg)-2]
+		cmd := redis.NewEmptyCommand()
+		cmd.Parts = [][]byte{cmdName}
+		return cmd, nil
 	} else {
+		if string(msg[:len(msg)-2]) == "PING" {
+			cmd := redis.NewEmptyCommand()
+			cmd.Parts = [][]byte{[]byte("PING")}
+			return cmd, nil
+		}
 		return nil, nil
 	}
 }

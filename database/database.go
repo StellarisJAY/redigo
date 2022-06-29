@@ -39,6 +39,7 @@ func (m *MultiDB) initCommandExecutors() {
 		return protocol.OKReply
 	}
 	m.executors["select"] = m.execSelectDB
+	m.executors["ping"] = m.execPing
 }
 
 func (m *MultiDB) SubmitCommand(command redis.Command) {
@@ -88,4 +89,15 @@ func (m *MultiDB) execSelectDB(command redis.Command) *protocol.Reply {
 		connection.SelectDB(index)
 		return protocol.OKReply
 	}
+}
+
+func (m *MultiDB) execPing(command redis.Command) *protocol.Reply {
+	args := command.Args()
+	var message string
+	if len(args) < 1 {
+		message = "PONG"
+	} else {
+		message = string(args[0])
+	}
+	return protocol.NewSingleStringReply(message)
 }
