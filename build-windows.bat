@@ -1,1 +1,1 @@
-go build -o ./redigo-server.exe main.go
+go build -o ./target/redigo-server.exe main.go
