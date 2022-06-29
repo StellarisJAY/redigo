@@ -1,6 +1,10 @@
 package database
 
 import (
+	"redigo/datastruct/dict"
+	"redigo/datastruct/list"
+	"redigo/datastruct/set"
+	"redigo/datastruct/zset"
 	"redigo/redis"
 	"redigo/redis/protocol"
 	"strconv"
@@ -15,6 +19,7 @@ func init() {
 	RegisterCommandExecutor("exists", execExists)
 	RegisterCommandExecutor("persist", execPersist)
 	RegisterCommandExecutor("expire", execExpire)
+	RegisterCommandExecutor("type", execType)
 }
 
 func execKeys(db *SingleDB, command redis.Command) *protocol.Reply {
@@ -138,4 +143,35 @@ func execExpire(db *SingleDB, command redis.Command) *protocol.Reply {
 		}
 		return protocol.NewNumberReply(1)
 	}
+}
+
+func execType(db *SingleDB, command redis.Command) *protocol.Reply {
+	args := command.Args()
+	if len(args) != 1 {
+		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("TYPE"))
+	}
+	v, exists := db.data.Get(string(args[0]))
+	var result string
+	if !exists {
+		result = "none"
+	} else {
+		result = typeOf(*(v.(*Entry)))
+	}
+	return protocol.NewSingleStringReply(result)
+}
+
+func typeOf(entry Entry) string {
+	switch entry.Data.(type) {
+	case dict.Dict:
+		return "hash"
+	case []byte:
+		return "string"
+	case *list.LinkedList:
+		return "list"
+	case *zset.SortedSet:
+		return "zset"
+	case *set.Set:
+		return "set"
+	}
+	return "none"
 }
