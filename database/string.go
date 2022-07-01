@@ -2,6 +2,7 @@ package database
 
 import (
 	"log"
+	"redigo/datastruct/bitmap"
 	"redigo/redis"
 	"redigo/redis/protocol"
 	"strconv"
@@ -25,6 +26,8 @@ func init() {
 	RegisterCommandExecutor("decr", executeDecr)
 	RegisterCommandExecutor("incrby", executeIncrby)
 	RegisterCommandExecutor("decrby", executeDecrby)
+	RegisterCommandExecutor("setbit", execSetBit)
+	RegisterCommandExecutor("getbit", execGetBit)
 }
 
 func executeSet(db *SingleDB, command redis.Command) *protocol.Reply {
@@ -93,20 +96,14 @@ func executeGet(db *SingleDB, command redis.Command) *protocol.Reply {
 	if args == nil || len(args) == 0 {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("get"))
 	}
-	key := string(args[0])
-	v, exists := db.data.Get(key)
-	if exists {
-		entry := v.(*Entry)
-		if isString(*entry) {
-			value := entry.Data.([]byte)
-			return protocol.NewBulkValueReply(value)
-		} else {
-			return protocol.NewErrorReply(protocol.WrongTypeOperationError)
-		}
-
-	} else {
-		return protocol.NilReply
+	result, exists, err := getString(db, string(args[0]))
+	if err != nil {
+		return protocol.NewErrorReply(err)
 	}
+	if exists {
+		return protocol.NewBulkValueReply(result)
+	}
+	return protocol.NilReply
 }
 
 func executeSetNX(db *SingleDB, command redis.Command) *protocol.Reply {
@@ -228,9 +225,89 @@ func add(db *SingleDB, key string, delta int) *protocol.Reply {
 	}
 }
 
+func execSetBit(db *SingleDB, command redis.Command) *protocol.Reply {
+	args := command.Args()
+	if len(args) != 3 {
+		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("SETBIT"))
+	}
+	// parse offset and bit number
+	offset, err := strconv.ParseInt(string(args[1]), 0, 64)
+	bit, err := strconv.ParseInt(string(args[2]), 0, 8)
+	if err != nil {
+		return protocol.NewErrorReply(protocol.HashValueNotIntegerError)
+	}
+	// get bitmap struct
+	bm, exists, err := getBitMap(db, string(args[0]))
+	if err != nil {
+		return protocol.NewErrorReply(err)
+	}
+	if !exists {
+		// create a new bitmap if not exist
+		bm = bitmap.New()
+		entry := &Entry{Data: bm}
+		db.data.Put(string(args[0]), entry)
+	}
+	original := bm.SetBit(offset, byte(bit))
+	return protocol.NewNumberReply(int(original))
+}
+
+func execGetBit(db *SingleDB, command redis.Command) *protocol.Reply {
+	args := command.Args()
+	if len(args) != 2 {
+		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("GETBIT"))
+	}
+	// check offset number
+	offset, err := strconv.ParseInt(string(args[1]), 0, 64)
+	if err != nil {
+		return protocol.NewErrorReply(protocol.HashValueNotIntegerError)
+	}
+	// get bitmap data structure
+	bitMap, exists, err := getBitMap(db, string(args[0]))
+	if err != nil {
+		return protocol.NewErrorReply(err)
+	}
+	if exists {
+		return protocol.NewNumberReply(int(bitMap.GetBit(offset)))
+	}
+	return protocol.NewNumberReply(0)
+}
+
+// getString get the value of this key, if not string returns an error
+func getString(db *SingleDB, key string) ([]byte, bool, error) {
+	v, exists := db.data.Get(key)
+	if !exists {
+		return nil, false, nil
+	}
+	entry := v.(*Entry)
+	if !isString(*entry) {
+		return nil, true, protocol.WrongTypeOperationError
+	}
+	return entry.Data.([]byte), true, nil
+}
+
+func getBitMap(db *SingleDB, key string) (*bitmap.BitMap, bool, error) {
+	v, exists := db.data.Get(key)
+	if !exists {
+		return nil, false, nil
+	}
+	entry := v.(*Entry)
+	if !isBitMap(*entry) {
+		return nil, true, protocol.WrongTypeOperationError
+	}
+	return entry.Data.(*bitmap.BitMap), true, nil
+}
+
 func isString(entry Entry) bool {
 	switch entry.Data.(type) {
 	case []byte:
+		return true
+	}
+	return false
+}
+
+func isBitMap(entry Entry) bool {
+	switch entry.Data.(type) {
+	case *bitmap.BitMap:
 		return true
 	}
 	return false
