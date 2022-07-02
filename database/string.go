@@ -274,11 +274,11 @@ func execGetBit(db *SingleDB, command redis.Command) *protocol.Reply {
 
 // getString get the value of this key, if not string returns an error
 func getString(db *SingleDB, key string) ([]byte, bool, error) {
-	v, exists := db.data.Get(key)
+	entry, exists := db.getEntry(key)
+	// check key's existence
 	if !exists {
 		return nil, false, nil
 	}
-	entry := v.(*Entry)
 	if !isString(*entry) {
 		return nil, true, protocol.WrongTypeOperationError
 	}
@@ -286,11 +286,10 @@ func getString(db *SingleDB, key string) ([]byte, bool, error) {
 }
 
 func getBitMap(db *SingleDB, key string) (*bitmap.BitMap, bool, error) {
-	v, exists := db.data.Get(key)
+	entry, exists := db.getEntry(key)
 	if !exists {
 		return nil, false, nil
 	}
-	entry := v.(*Entry)
 	if !isBitMap(*entry) {
 		return nil, true, protocol.WrongTypeOperationError
 	}

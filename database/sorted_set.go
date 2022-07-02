@@ -335,11 +335,10 @@ func isSortedSet(entry Entry) bool {
 }
 
 func getSortedSet(db *SingleDB, key string) (*zset.SortedSet, error) {
-	v, exists := db.data.Get(key)
+	entry, exists := db.getEntry(key)
 	if !exists {
 		return nil, nil
 	} else {
-		entry := v.(*Entry)
 		if isSortedSet(*entry) {
 			return entry.Data.(*zset.SortedSet), nil
 		}
@@ -348,13 +347,12 @@ func getSortedSet(db *SingleDB, key string) (*zset.SortedSet, error) {
 }
 
 func getOrInitSortedSet(db *SingleDB, key string) (*zset.SortedSet, error) {
-	v, exists := db.data.Get(key)
+	entry, exists := db.getEntry(key)
 	if !exists {
 		zs := zset.NewSortedSet()
 		db.data.Put(key, &Entry{Data: zs})
 		return zs, nil
 	} else {
-		entry := v.(*Entry)
 		if isSortedSet(*entry) {
 			return entry.Data.(*zset.SortedSet), nil
 		}

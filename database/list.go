@@ -190,15 +190,14 @@ func isLinkedList(entry *Entry) bool {
 }
 
 func getOrInitLinkedList(db *SingleDB, key string) (*list.LinkedList, error) {
-	v, exist := db.data.Get(key)
+	entry, exists := db.getEntry(key)
 	var linkedList *list.LinkedList
-	if !exist {
+	if !exists {
 		linkedList = list.NewLinkedList()
-		entry := &Entry{Data: linkedList}
+		entry = &Entry{Data: linkedList}
 		db.data.Put(key, entry)
 		return linkedList, nil
 	} else {
-		entry := v.(*Entry)
 		if isLinkedList(entry) {
 			linkedList = entry.Data.(*list.LinkedList)
 			return linkedList, nil
@@ -209,12 +208,11 @@ func getOrInitLinkedList(db *SingleDB, key string) (*list.LinkedList, error) {
 }
 
 func getLinkedList(db *SingleDB, key string) (*list.LinkedList, error) {
-	v, exist := db.data.Get(key)
+	entry, exists := db.getEntry(key)
 	var linkedList *list.LinkedList
-	if !exist {
+	if !exists {
 		return nil, nil
 	} else {
-		entry := v.(*Entry)
 		if isLinkedList(entry) {
 			linkedList = entry.Data.(*list.LinkedList)
 			return linkedList, nil

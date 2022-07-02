@@ -22,7 +22,7 @@ func init() {
 	RegisterCommandExecutor("type", execType)
 }
 
-func execKeys(command redis.Command, keys []string) *protocol.Reply {
+func execKeys(db *SingleDB, command redis.Command, keys []string) *protocol.Reply {
 	args := command.Args()
 	if len(args) != 1 {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("KEYS"))
@@ -33,7 +33,7 @@ func execKeys(command redis.Command, keys []string) *protocol.Reply {
 	p := pattern.ParsePattern(string(args[0]))
 	i := 0
 	for _, key := range keys {
-		if p.Matches(key) {
+		if p.Matches(key) && db.TTL(key) > 0 {
 			keys[i] = key
 			i++
 		}
@@ -47,7 +47,7 @@ func execTTL(db *SingleDB, command redis.Command) *protocol.Reply {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("ttl"))
 	}
 	key := string(args[0])
-	_, exists := db.data.Get(key)
+	_, exists := db.getEntry(string(args[0]))
 	if !exists {
 		return protocol.NewNumberReply(-2)
 	}
@@ -64,7 +64,7 @@ func execPTTL(db *SingleDB, command redis.Command) *protocol.Reply {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("ttl"))
 	}
 	key := string(args[0])
-	_, exists := db.data.Get(key)
+	_, exists := db.getEntry(key)
 	if !exists {
 		return protocol.NewNumberReply(-2)
 	}
@@ -114,10 +114,11 @@ func execPersist(db *SingleDB, command redis.Command) *protocol.Reply {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("persist"))
 	}
 	key := string(args[0])
-	removed := db.ttlMap.Remove(key)
-	if removed == 1 {
-		db.CancelTTL(key)
+	_, exists := db.getEntry(key)
+	if !exists {
+		return protocol.NewNumberReply(0)
 	}
+	removed := db.CancelTTL(key)
 	return protocol.NewNumberReply(removed)
 }
 
@@ -127,7 +128,7 @@ func execExpire(db *SingleDB, command redis.Command) *protocol.Reply {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("persist"))
 	}
 	key := string(args[0])
-	_, exists := db.data.Get(key)
+	_, exists := db.getEntry(key)
 	if !exists {
 		return protocol.NewNumberReply(0)
 	}
@@ -153,12 +154,12 @@ func execType(db *SingleDB, command redis.Command) *protocol.Reply {
 	if len(args) != 1 {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("TYPE"))
 	}
-	v, exists := db.data.Get(string(args[0]))
+	entry, exists := db.getEntry(string(args[0]))
 	var result string
 	if !exists {
 		result = "none"
 	} else {
-		result = typeOf(*(v.(*Entry)))
+		result = typeOf(*entry)
 	}
 	return protocol.NewSingleStringReply(result)
 }

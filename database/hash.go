@@ -282,9 +282,8 @@ func isHash(entry *Entry) bool {
 }
 
 func getOrInitHash(db *SingleDB, key string) (dict.Dict, error) {
-	v, exists := db.data.Get(key)
+	entry, exists := db.getEntry(key)
 	if exists {
-		entry := v.(*Entry)
 		if !isHash(entry) {
 			return nil, protocol.WrongTypeOperationError
 		}
@@ -297,9 +296,8 @@ func getOrInitHash(db *SingleDB, key string) (dict.Dict, error) {
 }
 
 func getHash(db *SingleDB, key string) (dict.Dict, bool, error) {
-	v, exists := db.data.Get(key)
+	entry, exists := db.getEntry(key)
 	if exists {
-		entry := v.(*Entry)
 		if !isHash(entry) {
 			return nil, false, protocol.WrongTypeOperationError
 		}

@@ -11,18 +11,20 @@ import (
 )
 
 type ServerProperties struct {
-	Port       string `cfg:"port"`
-	Databases  int    `cfg:"databases"`
-	AppendOnly bool   `cfg:"appendOnly"`
+	Port              string `cfg:"port"`
+	Databases         int    `cfg:"databases"`
+	AppendOnly        bool   `cfg:"appendOnly"`
+	UseScheduleExpire bool   `cfg:"useScheduleExpire"`
 }
 
 var Properties *ServerProperties
 
 func init() {
 	Properties = &ServerProperties{
-		Port:       "6380",
-		Databases:  16,
-		AppendOnly: false,
+		Port:              "6380",
+		Databases:         16,
+		AppendOnly:        false,
+		UseScheduleExpire: false,
 	}
 }
 
