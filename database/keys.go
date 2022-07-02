@@ -33,7 +33,7 @@ func execKeys(db *SingleDB, command redis.Command, keys []string) *protocol.Repl
 	p := pattern.ParsePattern(string(args[0]))
 	i := 0
 	for _, key := range keys {
-		if p.Matches(key) && db.TTL(key) > 0 {
+		if p.Matches(key) && db.TTL(key) != -2 {
 			keys[i] = key
 			i++
 		}
