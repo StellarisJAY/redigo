@@ -6,13 +6,13 @@ RediGO是用Go语言实现的Redis服务器。通过该项目学习Redis原理�
 
 - [x] 支持string、list、hash、set、sorted_set数据结构的主要命令
 - [x] key过期功能（TTL、EXPIRE），时间轮定时删除
+- [x] 无阻塞Keys命令
 - [ ] Bitmap数据结构
 - [ ] Geo地理位置
 - [ ] RDB持久化
 - [ ] AOF持久化和AOF重写
 - [ ] 发布订阅功能
 - [ ] multi事务功能
-- [ ] 并发命令处理，避免如KEYS等命令导致其他命令阻塞
 
 
 
@@ -20,12 +20,12 @@ RediGO是用Go语言实现的Redis服务器。通过该项目学习Redis原理�
 
 | 数据结构 | 已实现                                                       |
 | -------- | ------------------------------------------------------------ |
-| string   | GET, SET, SETNX, INCR, DECR, INCRYBY, DECRBY, APPEND, STRLEN |
+| string   | GET, SET, SETNX, INCR, DECR, INCRYBY, DECRBY, APPEND, STRLEN, SETBIT, GETBIT |
 | list     | LPUSH, LPOP, RPUSH, RPOP, LRANGE, LINDEX, LLEN, LPUSHRPOP    |
 | hash     | HGET, HSET, HDEL, HEXISTS, HGETALL, HKEYS, HLEN, HMGET, HSETNX, HINCRBY, HSTRLEN, HVALS |
 | set      | SADD, SMEMBERS ,SISMEMBER, SRANDMEMBER, SREM, SPOP, SDIFF, SINTER, SCARD, SDIFFSTORE, SINTERSTORE, SUNION |
 | zset     | ZADD, ZSCORE, ZREM, ZRANK, ZPOPMIN, ZPOPMAX, ZCARD, ZRANGE, ZRANGEBYSCORE |
-| 其他     | TTL, PTTL, EXPIRE, PERSIST, DEL, EXISTS, PING, TYPE, SELECT  |
+| 其他     | TTL, PTTL, EXPIRE, PERSIST, DEL, EXISTS, PING, TYPE, SELECT, KEYS |
 
 
 
