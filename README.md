@@ -5,9 +5,10 @@ RediGO是用Go语言实现的Redis服务器。通过该项目学习Redis原理�
 关键功能：
 
 - [x] 支持string、list、hash、set、sorted_set数据结构的主要命令
-- [x] key过期功能（TTL、EXPIRE），时间轮定时删除
+- [x] key过期功能（TTL、EXPIRE），时间轮定时删除策略+惰性删除策略
 - [x] 无阻塞Keys命令
-- [ ] Bitmap数据结构
+- [x] Bitmap数据结构
+- [ ] LRU内存淘汰策略
 - [ ] Geo地理位置
 - [ ] RDB持久化
 - [ ] AOF持久化和AOF重写
@@ -31,7 +32,7 @@ RediGO是用Go语言实现的Redis服务器。通过该项目学习Redis原理�
 
 ## 运行RediGO
 
-### 源码编译运行
+### 编译运行
 
 运行编译脚本，获得可执行文件
 
@@ -42,7 +43,18 @@ RediGO是用Go语言实现的Redis服务器。通过该项目学习Redis原理�
 ./build-windos.bat
 ```
 
-运行target目录下的可执行文件，使用 -p 指定使用的端口号（默认6380）
+在target目录下（可执行文件目录下）创建redis.conf配置文件
+
+```
+# 端口号（默认6380）
+port 6399
+# 数据库数量（默认16）
+databases 16
+# 启用过期key定时删除（默认关闭，避免定时任务占用CPU）
+useScheduleExpire true
+```
+
+运行target目录下的可执行文件，显示如下信息后可使用Redis客户端访问
 
 ![](https://images-1257369645.cos.ap-chengdu.myqcloud.com/redigo/redigo_start.PNG)
 
