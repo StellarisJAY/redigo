@@ -41,13 +41,24 @@ func (db *SingleDB) SubmitCommand(command redis.Command) {
 */
 func (db *SingleDB) Execute(command redis.Command) *protocol.Reply {
 	cmd := command.Name()
-	exec, exists := executors[cmd]
-	if exists {
-		reply := exec.execFunc(db, command)
-		return reply
+	if cmd == "keys" {
+		// get all keys from db, but don't match pattern now
+		keys := db.data.Keys()
+		// start a new goroutine to do pattern matching
+		go func(command redis.Command, keys []string) {
+			reply := execKeys(command, keys)
+			command.Connection().SendReply(reply)
+		}(command, keys)
+		return nil
 	} else {
-		// command executor doesn't exist, send unknown command to client
-		return protocol.NewErrorReply(protocol.CreateUnknownCommandError(cmd))
+		exec, exists := executors[cmd]
+		if exists {
+			reply := exec.execFunc(db, command)
+			return reply
+		} else {
+			// command executor doesn't exist, send unknown command to client
+			return protocol.NewErrorReply(protocol.CreateUnknownCommandError(cmd))
+		}
 	}
 }
 

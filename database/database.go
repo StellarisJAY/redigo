@@ -57,7 +57,9 @@ func (m *MultiDB) ExecuteLoop() error {
 		cmd := <-m.cmdChan
 		// execute command and get a reply if command is not dispatched to single database
 		reply := m.Execute(cmd)
-		cmd.Connection().SendReply(reply)
+		if reply != nil {
+			cmd.Connection().SendReply(reply)
+		}
 	}
 }
 
