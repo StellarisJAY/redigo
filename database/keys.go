@@ -7,12 +7,12 @@ import (
 	"redigo/datastruct/zset"
 	"redigo/redis"
 	"redigo/redis/protocol"
+	"redigo/util/pattern"
 	"strconv"
 	"time"
 )
 
 func init() {
-	RegisterCommandExecutor("keys", execKeys)
 	RegisterCommandExecutor("ttl", execTTL)
 	RegisterCommandExecutor("pttl", execPTTL)
 	RegisterCommandExecutor("del", execDel)
@@ -22,20 +22,23 @@ func init() {
 	RegisterCommandExecutor("type", execType)
 }
 
-func execKeys(db *SingleDB, command redis.Command) *protocol.Reply {
+func execKeys(command redis.Command, keys []string) *protocol.Reply {
 	args := command.Args()
-	if len(args) == 0 {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("keys"))
+	if len(args) != 1 {
+		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("KEYS"))
 	}
-	keys := make([]string, db.data.Len())
+	if string(args[0]) == "*" {
+		return protocol.NewStringArrayReply(keys)
+	}
+	p := pattern.ParsePattern(string(args[0]))
 	i := 0
-	// todo add pattern matching here
-	db.data.ForEach(func(key string, value interface{}) bool {
-		keys[i] = key
-		i++
-		return true
-	})
-	return protocol.NewStringArrayReply(keys)
+	for _, key := range keys {
+		if p.Matches(key) {
+			keys[i] = key
+			i++
+		}
+	}
+	return protocol.NewStringArrayReply(keys[:i])
 }
 
 func execTTL(db *SingleDB, command redis.Command) *protocol.Reply {
