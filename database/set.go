@@ -28,17 +28,9 @@ func execSAdd(db *SingleDB, command redis.Command) *protocol.Reply {
 	if len(args) < 2 {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("SADD"))
 	}
-	v, exists := db.data.Get(string(args[0]))
-	var s *set.Set
-	if exists {
-		entry := v.(*Entry)
-		if !isSet(*entry) {
-			return protocol.NewErrorReply(protocol.WrongTypeOperationError)
-		}
-		s = entry.Data.(*set.Set)
-	} else {
-		s = set.NewSet()
-		db.data.Put(string(args[0]), &Entry{Data: s})
+	s, err := getOrCreateSet(db, string(args[0]))
+	if err != nil {
+		return protocol.NewErrorReply(err)
 	}
 	vals := args[1:]
 	count := 0
@@ -53,13 +45,11 @@ func execSIsMember(db *SingleDB, command redis.Command) *protocol.Reply {
 	if len(args) < 2 {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("SISMEMBER"))
 	}
-	v, exists := db.data.Get(string(args[0]))
-	if exists {
-		entry := v.(*Entry)
-		if !isSet(*entry) {
-			return protocol.NewErrorReply(protocol.WrongTypeOperationError)
-		}
-		s := entry.Data.(*set.Set)
+	s, err := getSet(db, string(args[0]))
+	if err != nil {
+		return protocol.NewErrorReply(err)
+	}
+	if s != nil {
 		return protocol.NewNumberReply(s.Has(string(args[1])))
 	}
 	return protocol.NewNumberReply(0)
@@ -70,13 +60,11 @@ func execSMembers(db *SingleDB, command redis.Command) *protocol.Reply {
 	if len(args) != 1 {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("SMEMBERS"))
 	}
-	v, exists := db.data.Get(string(args[0]))
-	if exists {
-		entry := v.(*Entry)
-		if !isSet(*entry) {
-			return protocol.NewErrorReply(protocol.WrongTypeOperationError)
-		}
-		s := entry.Data.(*set.Set)
+	s, err := getSet(db, string(args[0]))
+	if err != nil {
+		return protocol.NewErrorReply(err)
+	}
+	if s != nil {
 		return protocol.NewStringArrayReply(s.Members())
 	}
 	return protocol.EmptyListReply
@@ -92,13 +80,11 @@ func execSRandomMember(db *SingleDB, command redis.Command) *protocol.Reply {
 	if err != nil {
 		return protocol.NewErrorReply(protocol.HashValueNotIntegerError)
 	}
-	v, exists := db.data.Get(string(args[0]))
-	if exists {
-		entry := v.(*Entry)
-		if !isSet(*entry) {
-			return protocol.NewErrorReply(protocol.WrongTypeOperationError)
-		}
-		s := entry.Data.(*set.Set)
+	s, err := getSet(db, string(args[0]))
+	if err != nil {
+		return protocol.NewErrorReply(err)
+	}
+	if s != nil {
 		return protocol.NewStringArrayReply(s.RandomMembers(count))
 	}
 	return protocol.EmptyListReply
@@ -109,13 +95,11 @@ func execSRem(db *SingleDB, command redis.Command) *protocol.Reply {
 	if len(args) < 2 {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("LREM"))
 	}
-	v, exists := db.data.Get(string(args[0]))
-	if exists {
-		entry := v.(*Entry)
-		if !isSet(*entry) {
-			return protocol.NewErrorReply(protocol.WrongTypeOperationError)
-		}
-		s := entry.Data.(*set.Set)
+	s, err := getSet(db, string(args[0]))
+	if err != nil {
+		return protocol.NewErrorReply(err)
+	}
+	if s != nil {
 		values := args[1:]
 		count := 0
 		for _, value := range values {
@@ -136,14 +120,11 @@ func execSPop(db *SingleDB, command redis.Command) *protocol.Reply {
 	if err != nil {
 		return protocol.NewErrorReply(protocol.HashValueNotIntegerError)
 	}
-	v, exists := db.data.Get(string(args[0]))
-	if exists {
-		// check if entry is Set data structure
-		entry := v.(*Entry)
-		if !isSet(*entry) {
-			return protocol.NewErrorReply(protocol.WrongTypeOperationError)
-		}
-		s := entry.Data.(*set.Set)
+	s, err := getSet(db, string(args[0]))
+	if err != nil {
+		return protocol.NewErrorReply(err)
+	}
+	if s != nil {
 		members := s.RandomMembersDistinct(count)
 		for _, member := range members {
 			s.Remove(member)
@@ -158,23 +139,20 @@ func execSDiff(db *SingleDB, command redis.Command) *protocol.Reply {
 	if len(args) != 2 {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("SDIFF"))
 	}
-	v1, exists1 := db.data.Get(string(args[0]))
-	v2, exists2 := db.data.Get(string(args[1]))
-	if exists1 && exists2 {
-		entry1 := v1.(*Entry)
-		entry2 := v2.(*Entry)
-		if !isSet(*entry1) || !isSet(*entry2) {
-			return protocol.NewErrorReply(protocol.WrongTypeOperationError)
-		}
-		s1 := entry1.Data.(*set.Set)
-		diff := s1.Diff(entry2.Data.(*set.Set))
+	s1, err := getSet(db, string(args[0]))
+	if err != nil {
+		return protocol.NewErrorReply(err)
+	}
+	s2, err := getSet(db, string(args[1]))
+	if err != nil {
+		return protocol.NewErrorReply(err)
+	}
+
+	if s1 != nil && s2 != nil {
+		diff := s1.Diff(s2)
 		return protocol.NewStringArrayReply(diff)
-	} else if exists1 {
-		entry1 := v1.(*Entry)
-		if !isSet(*entry1) {
-			return protocol.NewErrorReply(protocol.WrongTypeOperationError)
-		}
-		return protocol.NewStringArrayReply(entry1.Data.(*set.Set).Members())
+	} else if s1 != nil {
+		return protocol.NewStringArrayReply(s1.Members())
 	} else {
 		return protocol.EmptyListReply
 	}
@@ -185,25 +163,21 @@ func execSDiffStore(db *SingleDB, command redis.Command) *protocol.Reply {
 	if len(args) != 3 {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("SDIFF"))
 	}
-	v1, exists1 := db.data.Get(string(args[1]))
-	v2, exists2 := db.data.Get(string(args[2]))
+	s1, err := getSet(db, string(args[0]))
+	if err != nil {
+		return protocol.NewErrorReply(err)
+	}
+	s2, err := getSet(db, string(args[1]))
+	if err != nil {
+		return protocol.NewErrorReply(err)
+	}
 	// check set1 and set2 existence and data type
 	var diff []string
-	if exists1 && exists2 {
-		entry1 := v1.(*Entry)
-		entry2 := v2.(*Entry)
-		if !isSet(*entry1) || !isSet(*entry2) {
-			return protocol.NewErrorReply(protocol.WrongTypeOperationError)
-		}
-		s1 := entry1.Data.(*set.Set)
+	if s1 != nil && s2 != nil {
 		// get diff from s1 and s2
-		diff = s1.Diff(entry2.Data.(*set.Set))
-	} else if exists1 {
-		entry1 := v1.(*Entry)
-		if !isSet(*entry1) {
-			return protocol.NewErrorReply(protocol.WrongTypeOperationError)
-		}
-		diff = entry1.Data.(*set.Set).Members()
+		diff = s1.Diff(s2)
+	} else if s1 != nil {
+		diff = s1.Members()
 	} else {
 		diff = []string{}
 	}
@@ -221,17 +195,17 @@ func execSInter(db *SingleDB, command redis.Command) *protocol.Reply {
 	if len(args) != 2 {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("SINTER"))
 	}
-	v1, exists1 := db.data.Get(string(args[0]))
-	v2, exists2 := db.data.Get(string(args[1]))
-	if exists1 && exists2 {
-		entry1 := v1.(*Entry)
-		entry2 := v2.(*Entry)
-		if !isSet(*entry1) || !isSet(*entry2) {
-			return protocol.NewErrorReply(protocol.WrongTypeOperationError)
-		}
-		s1 := entry1.Data.(*set.Set)
-		diff := s1.Inter(entry2.Data.(*set.Set))
-		return protocol.NewStringArrayReply(diff)
+	s1, err := getSet(db, string(args[0]))
+	if err != nil {
+		return protocol.NewErrorReply(err)
+	}
+	s2, err := getSet(db, string(args[1]))
+	if err != nil {
+		return protocol.NewErrorReply(err)
+	}
+	if s1 != nil && s2 != nil {
+		inter := s1.Inter(s2)
+		return protocol.NewStringArrayReply(inter)
 	} else {
 		return protocol.EmptyListReply
 	}
@@ -242,19 +216,18 @@ func execSInterStore(db *SingleDB, command redis.Command) *protocol.Reply {
 	if len(args) != 3 {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("SINTERSTORE"))
 	}
-	v1, exists1 := db.data.Get(string(args[1]))
-	v2, exists2 := db.data.Get(string(args[2]))
-
+	s1, err := getSet(db, string(args[0]))
+	if err != nil {
+		return protocol.NewErrorReply(err)
+	}
+	s2, err := getSet(db, string(args[1]))
+	if err != nil {
+		return protocol.NewErrorReply(err)
+	}
 	var inter []string
 	// check set1 and set2 existence and data type
-	if exists1 && exists2 {
-		entry1 := v1.(*Entry)
-		entry2 := v2.(*Entry)
-		if !isSet(*entry1) || !isSet(*entry2) {
-			return protocol.NewErrorReply(protocol.WrongTypeOperationError)
-		}
-		s1 := entry1.Data.(*set.Set)
-		inter = s1.Inter(entry2.Data.(*set.Set))
+	if s1 != nil && s2 != nil {
+		inter = s1.Inter(s2)
 	} else {
 		inter = []string{}
 	}
@@ -271,13 +244,8 @@ func execSCard(db *SingleDB, command redis.Command) *protocol.Reply {
 	if len(args) != 1 {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("SCARD"))
 	}
-	v, exists := db.data.Get(string(args[0]))
+	entry, exists := db.getEntry(string(args[0]))
 	if exists {
-		// check if entry is Set data structure
-		entry := v.(*Entry)
-		if !isSet(*entry) {
-			return protocol.NewErrorReply(protocol.WrongTypeOperationError)
-		}
 		s := entry.Data.(*set.Set)
 		return protocol.NewNumberReply(s.Len())
 	}
@@ -289,31 +257,51 @@ func execSUnion(db *SingleDB, command redis.Command) *protocol.Reply {
 	if len(args) != 2 {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("SINTER"))
 	}
-	v1, exists1 := db.data.Get(string(args[0]))
-	v2, exists2 := db.data.Get(string(args[1]))
-	if exists1 && exists2 {
-		entry1 := v1.(*Entry)
-		entry2 := v2.(*Entry)
-		if !isSet(*entry1) || !isSet(*entry2) {
-			return protocol.NewErrorReply(protocol.WrongTypeOperationError)
-		}
-		s1 := entry1.Data.(*set.Set)
-		union := s1.Union(entry2.Data.(*set.Set))
+	s1, err := getSet(db, string(args[0]))
+	if err != nil {
+		return protocol.NewErrorReply(err)
+	}
+	s2, err := getSet(db, string(args[1]))
+	if err != nil {
+		return protocol.NewErrorReply(err)
+	}
+	if s1 != nil && s2 != nil {
+		union := s1.Union(s2)
 		return protocol.NewStringArrayReply(union)
-	} else if exists1 {
-		entry1 := v1.(*Entry)
-		if !isSet(*entry1) {
-			return protocol.NewErrorReply(protocol.WrongTypeOperationError)
-		}
-		return protocol.NewStringArrayReply(entry1.Data.(*set.Set).Members())
-	} else if exists2 {
-		entry2 := v2.(*Entry)
-		if !isSet(*entry2) {
-			return protocol.NewErrorReply(protocol.WrongTypeOperationError)
-		}
-		return protocol.NewStringArrayReply(entry2.Data.(*set.Set).Members())
+	} else if s1 != nil {
+		return protocol.NewStringArrayReply(s1.Members())
+	} else if s2 != nil {
+		return protocol.NewStringArrayReply(s2.Members())
 	} else {
 		return protocol.EmptyListReply
+	}
+}
+
+func getOrCreateSet(db *SingleDB, key string) (*set.Set, error) {
+	entry, exists := db.getEntry(key)
+	if !exists {
+		s := set.NewSet()
+		entry = &Entry{Data: s}
+		db.data.Put(key, entry)
+		return s, nil
+	} else {
+		if isSet(*entry) {
+			return entry.Data.(*set.Set), nil
+		}
+		return nil, protocol.WrongTypeOperationError
+	}
+}
+
+func getSet(db *SingleDB, key string) (*set.Set, error) {
+	entry, exists := db.getEntry(key)
+	if !exists {
+		return nil, nil
+	} else {
+		if isSet(*entry) {
+			return entry.Data.(*set.Set), nil
+		} else {
+			return nil, protocol.WrongTypeOperationError
+		}
 	}
 }
 
