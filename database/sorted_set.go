@@ -55,6 +55,7 @@ func execZAdd(db *SingleDB, command redis.Command) *protocol.Reply {
 	for _, ele := range elements {
 		result += zs.Add(ele.Member, ele.Score)
 	}
+	db.addAof(command.Parts)
 	return protocol.NewNumberReply(result)
 }
 
@@ -92,6 +93,7 @@ func execZRem(db *SingleDB, command redis.Command) *protocol.Reply {
 	for _, member := range args[1:] {
 		result += zs.Remove(string(member))
 	}
+	db.addAof(command.Parts)
 	return protocol.NewNumberReply(result)
 }
 
@@ -142,6 +144,7 @@ func execPopMax(db *SingleDB, command redis.Command) *protocol.Reply {
 				j += 2
 			}
 		}
+		db.addAof(command.Parts)
 		return protocol.NewStringArrayReply(result)
 	}
 	return protocol.EmptyListReply
@@ -177,6 +180,7 @@ func execPopMin(db *SingleDB, command redis.Command) *protocol.Reply {
 				j += 2
 			}
 		}
+		db.addAof(command.Parts)
 		return protocol.NewStringArrayReply(result)
 	}
 	return protocol.EmptyListReply
