@@ -78,12 +78,18 @@ func executeSet(db *SingleDB, command redis.Command) *protocol.Reply {
 	case updatePolicy:
 		result = db.data.PutIfExists(key, entry)
 	}
+
+	db.addAof(command.Parts)
 	// set ttl
 	if expireTime != infiniteExpireTime {
 		db.Expire(key, delay)
 	} else {
 		// cancel old ttl
-		db.CancelTTL(key)
+		cancelled := db.CancelTTL(key)
+		if cancelled == 1 {
+			// add PERSIST command to aof
+			db.addAof([][]byte{[]byte("persist"), args[0]})
+		}
 	}
 	if result == 0 {
 		return protocol.NilReply
@@ -117,7 +123,13 @@ func executeSetNX(db *SingleDB, command redis.Command) *protocol.Reply {
 	entry := &database.Entry{Data: value}
 	exists := db.data.PutIfAbsent(key, entry)
 	if exists != 0 {
-		db.CancelTTL(key)
+		// add command to AOF
+		db.addAof(command.Parts)
+		canceled := db.CancelTTL(key)
+		if canceled == 1 {
+			// add PERSIST command to aof
+			db.addAof([][]byte{[]byte("persist"), args[0]})
+		}
 	}
 	return protocol.NewNumberReply(exists)
 }
@@ -145,11 +157,13 @@ func executeAppend(db *SingleDB, command redis.Command) *protocol.Reply {
 		entry.Data = value
 		_ = db.data.Put(key, entry)
 		length = len(value)
+		db.addAof(command.Parts)
 	} else {
 		// key doesn't exist.
 		entry := &database.Entry{Data: appendValue}
 		_ = db.data.Put(key, entry)
 		length = len(appendValue)
+		db.addAof([][]byte{[]byte("SET"), args[0], args[1]})
 	}
 	return protocol.NewNumberReply(length)
 }
