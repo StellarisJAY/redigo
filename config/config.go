@@ -15,9 +15,16 @@ type ServerProperties struct {
 	Databases         int    `cfg:"databases"`
 	AppendOnly        bool   `cfg:"appendOnly"`
 	UseScheduleExpire bool   `cfg:"useScheduleExpire"`
+	AppendFsync       string `cfg:"appendfsync"`
+	AofFileName       string `cfg:"appendfilename"`
 }
 
 var Properties *ServerProperties
+
+const (
+	AofEverySec = "everysec"
+	AofAlways   = "always"
+)
 
 func init() {
 	Properties = &ServerProperties{
@@ -25,6 +32,8 @@ func init() {
 		Databases:         16,
 		AppendOnly:        false,
 		UseScheduleExpire: false,
+		AppendFsync:       AofAlways,
+		AofFileName:       "appendonly.aof",
 	}
 }
 

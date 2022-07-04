@@ -18,6 +18,7 @@ type SingleDB struct {
 	ttlMap dict.Dict
 	lock   *lock.Locker
 	idx    int
+	addAof func([][]byte)
 }
 
 func NewSingleDB(idx int) *SingleDB {
@@ -26,6 +27,7 @@ func NewSingleDB(idx int) *SingleDB {
 		ttlMap: dict.NewSimpleDict(),
 		lock:   lock.NewLock(1024),
 		idx:    idx,
+		addAof: func(i [][]byte) {},
 	}
 }
 

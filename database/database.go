@@ -1,6 +1,8 @@
 package database
 
 import (
+	"redigo/aof"
+	"redigo/config"
 	"redigo/interface/database"
 	"redigo/redis"
 	"redigo/redis/protocol"
@@ -8,9 +10,10 @@ import (
 )
 
 type MultiDB struct {
-	dbSet     []database.DB
-	cmdChan   chan redis.Command
-	executors map[string]func(redis.Command) *protocol.Reply
+	dbSet      []database.DB
+	cmdChan    chan redis.Command
+	executors  map[string]func(redis.Command) *protocol.Reply
+	aofHandler *aof.Handler
 }
 
 func NewMultiDB(dbSize, cmdChanSize int) *MultiDB {
@@ -23,6 +26,21 @@ func NewMultiDB(dbSize, cmdChanSize int) *MultiDB {
 	// initialize single databases in db set
 	for i := 0; i < dbSize; i++ {
 		db.dbSet[i] = NewSingleDB(i)
+	}
+	// initialize AOF
+	if config.Properties.AppendOnly {
+		aofHandler, err := aof.NewAofHandler(db)
+		if err != nil {
+			panic(err)
+		}
+		for _, sdb := range db.dbSet {
+			singleDB := sdb.(*SingleDB)
+			// make singleDB's addAof call aofHandler's AddAOF
+			singleDB.addAof = func(command [][]byte) {
+				aofHandler.AddAof(command, singleDB.idx)
+			}
+		}
+		db.aofHandler = aofHandler
 	}
 	return db
 }
