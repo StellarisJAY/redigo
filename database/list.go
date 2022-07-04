@@ -32,6 +32,7 @@ func execLPush(db *SingleDB, command redis.Command) *protocol.Reply {
 	for _, arg := range args[1:] {
 		linkedList.AddLeft(arg)
 	}
+	db.addAof(command.Parts)
 	return protocol.NewNumberReply(linkedList.Size())
 }
 
@@ -47,6 +48,7 @@ func execLPop(db *SingleDB, command redis.Command) *protocol.Reply {
 	if linkedList != nil {
 		left := linkedList.RemoveLeft()
 		if left != nil {
+			db.addAof(command.Parts)
 			return protocol.NewBulkValueReply(left)
 		} else {
 			return protocol.NilReply
@@ -67,6 +69,7 @@ func execRPush(db *SingleDB, command redis.Command) *protocol.Reply {
 	for _, arg := range args[1:] {
 		linkedList.AddRight(arg)
 	}
+	db.addAof(command.Parts)
 	return protocol.NewNumberReply(linkedList.Size())
 }
 
@@ -83,6 +86,7 @@ func execRPop(db *SingleDB, command redis.Command) *protocol.Reply {
 		// pop right element
 		right := linkedList.RemoveRight()
 		if right != nil {
+			db.addAof(command.Parts)
 			return protocol.NewBulkValueReply(right)
 		}
 	}
@@ -182,7 +186,10 @@ func execRPopLPush(db *SingleDB, command redis.Command) *protocol.Reply {
 	}
 	// pop src right element, put into dest left
 	element := srcList.RemoveRight()
-	destList.AddLeft(element)
+	if element != nil {
+		db.addAof(command.Parts)
+		destList.AddLeft(element)
+	}
 	return protocol.NewBulkValueReply(element)
 }
 
