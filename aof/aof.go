@@ -25,11 +25,13 @@ type Handler struct {
 	aofFile   *os.File
 	currentDB int          // current database index, if index changed, must append a SELECT command
 	ticker    *time.Ticker // ticker for EverySec policy
+	closeChan chan struct{}
 }
 
 func NewAofHandler(db database.DB) (*Handler, error) {
 	handler := &Handler{db: db}
 	handler.aofChan = make(chan Payload, 1024)
+	handler.closeChan = make(chan struct{})
 	// create a ticker for EverySec AOF
 	if config.Properties.AppendFsync == config.AofEverySec {
 		handler.ticker = time.NewTicker(1 * time.Second)
@@ -64,6 +66,20 @@ func (h *Handler) AddAof(command [][]byte, index int) {
 // handle func of AOF
 func (h *Handler) handle() {
 	for {
+		select {
+		case <-h.closeChan:
+			// receive close signal, break handle loop
+			h.handleClose(len(h.aofChan))
+			break
+		case payload := <-h.aofChan:
+			h.handlePayload(payload)
+		}
+	}
+}
+
+// handle the remaining un-written commands before closing
+func (h *Handler) handleClose(remaining int) {
+	for i := 0; i < remaining; i++ {
 		payload := <-h.aofChan
 		h.handlePayload(payload)
 	}
@@ -114,4 +130,8 @@ func (h *Handler) loadAof() error {
 		h.db.Execute(*cmd)
 	}
 	return nil
+}
+
+func (h *Handler) Close() {
+	h.closeChan <- struct{}{}
 }

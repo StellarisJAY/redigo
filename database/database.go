@@ -58,8 +58,10 @@ func (m *MultiDB) SubmitCommand(command redis.Command) {
 }
 
 func (m *MultiDB) Close() {
-	//TODO implement me
-	panic("implement me")
+	if m.aofHandler != nil {
+		// close aof handler
+		m.aofHandler.Close()
+	}
 }
 
 // ExecuteLoop of Multi Database
