@@ -30,7 +30,7 @@ type Handler struct {
 
 func NewAofHandler(db database.DB) (*Handler, error) {
 	handler := &Handler{db: db}
-	handler.aofChan = make(chan Payload, 1024)
+	handler.aofChan = make(chan Payload, 1<<16)
 	handler.closeChan = make(chan struct{})
 	// create a ticker for EverySec AOF
 	if config.Properties.AppendFsync == config.AofEverySec {
@@ -50,7 +50,12 @@ func NewAofHandler(db database.DB) (*Handler, error) {
 	}
 	log.Println("AOF loaded, time used: ", time.Now().Sub(start).Milliseconds(), "ms")
 	go func() {
-		handler.handle()
+		// fsync policies: always or every sec
+		if config.Properties.AppendFsync == config.AofAlways {
+			handler.handleAlways()
+		} else {
+			handler.handleEverySec()
+		}
 	}()
 	return handler, nil
 }
@@ -63,13 +68,33 @@ func (h *Handler) AddAof(command [][]byte, index int) {
 	h.aofChan <- payload
 }
 
-// handle func of AOF
-func (h *Handler) handle() {
+// handle commands every second
+func (h *Handler) handleEverySec() {
 	for {
 		select {
 		case <-h.closeChan:
 			// receive close signal, break handle loop
-			h.handleClose(len(h.aofChan))
+			h.handleRemaining(len(h.aofChan))
+			break
+		case <-h.ticker.C:
+			// handle remaining commands in aof queue every sec
+			remaining := len(h.aofChan)
+			if remaining > 0 {
+				h.handleRemaining(len(h.aofChan))
+				log.Println("Aof written, cmd count: ", remaining)
+			}
+			continue
+		}
+	}
+}
+
+// handle func of AOF
+func (h *Handler) handleAlways() {
+	for {
+		select {
+		case <-h.closeChan:
+			// receive close signal, break handle loop
+			h.handleRemaining(len(h.aofChan))
 			break
 		case payload := <-h.aofChan:
 			h.handlePayload(payload)
@@ -78,7 +103,7 @@ func (h *Handler) handle() {
 }
 
 // handle the remaining un-written commands before closing
-func (h *Handler) handleClose(remaining int) {
+func (h *Handler) handleRemaining(remaining int) {
 	for i := 0; i < remaining; i++ {
 		payload := <-h.aofChan
 		h.handlePayload(payload)
