@@ -151,6 +151,17 @@ func (l *LinkedList) LeftRange(start, end int) [][]byte {
 	return result
 }
 
+func (l *LinkedList) ForEach(fun func(idx int, value []byte) bool) {
+	n := l.left
+
+	for i := 0; n != nil; i++ {
+		if !fun(i, n.value) {
+			break
+		}
+		n = n.next
+	}
+}
+
 func NewLinkedList(vals ...[]byte) *LinkedList {
 	l := &LinkedList{}
 	for _, val := range vals {

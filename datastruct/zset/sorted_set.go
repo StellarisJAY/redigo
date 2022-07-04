@@ -99,3 +99,11 @@ func (zs *SortedSet) RangeByScore(min, max float64, offset, count int, lOpen, rO
 	}
 	return zs.skl.RangeByScore(min, max, offset, count, lOpen, rOpen)
 }
+
+func (zs *SortedSet) ForEach(fun func(score float64, value string) bool) {
+	for _, v := range zs.dict {
+		if !fun(v.Score, v.Member) {
+			break
+		}
+	}
+}
