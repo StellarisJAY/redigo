@@ -5,8 +5,11 @@ import (
 	"net"
 	"net/http"
 	_ "net/http/pprof"
+	"os"
+	"os/signal"
 	"redigo/interface/database"
 	"sync"
+	"syscall"
 )
 
 type Handler interface {
@@ -51,12 +54,29 @@ func (s *Server) Start() error {
 	go func() {
 		// wait for close signal
 		<-s.closeChan
+		log.Println("Shutting down RediGO server...")
+		// close client connections
 		s.activeConns.Range(func(key, value interface{}) bool {
 			key.(*Connection).Close()
 			return true
 		})
+		// close database
+		s.db.Close()
+		_ = s.listener.Close()
+	}()
+	// Read sys calls
+	sigCh := make(chan os.Signal)
+	signal.Notify(sigCh, syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT)
+	go func() {
+		sig := <-sigCh
+		switch sig {
+		case syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT:
+			// send close signal
+			s.closeChan <- struct{}{}
+		}
 	}()
 
+	// pprof here
 	go func() {
 		_ = http.ListenAndServe(":8899", nil)
 	}()
@@ -65,10 +85,9 @@ func (s *Server) Start() error {
 	// run acceptor
 	err = s.acceptLoop()
 	if err != nil {
-		log.Println("Accept loop error: ", err)
+		// signal close server
+		s.closeChan <- struct{}{}
 	}
-	// signal close server
-	s.closeChan <- struct{}{}
 	return nil
 }
 
@@ -80,8 +99,7 @@ func (s *Server) acceptLoop() error {
 	for {
 		conn, err := s.listener.Accept()
 		if err != nil {
-			log.Println("Accept connection error: ", err)
-			continue
+			return nil
 		}
 		// create connection struct
 		connection := NewConnection(conn, s.db)
@@ -92,7 +110,7 @@ func (s *Server) acceptLoop() error {
 			rErr := connect.ReadLoop()
 			if rErr != nil {
 				connect.Close()
-				log.Println("Connection closed by remote client: ", connect.Conn.RemoteAddr().String())
+				//log.Println("Connection closed by remote client: ", connect.Conn.RemoteAddr().String())
 			}
 			s.activeConns.Delete(connect)
 		}(connection)
@@ -102,7 +120,7 @@ func (s *Server) acceptLoop() error {
 			wErr := connect.WriteLoop()
 			if wErr != nil {
 				connect.Close()
-				log.Println("Connection closed by remote client: ", connect.Conn.RemoteAddr().String())
+				//log.Println("Connection closed by remote client: ", connect.Conn.RemoteAddr().String())
 			}
 			s.activeConns.Delete(connect)
 		}(connection)
