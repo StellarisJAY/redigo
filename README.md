@@ -8,10 +8,11 @@ RediGO是用Go语言实现的Redis服务器。通过该项目学习Redis原理�
 - [x] key过期功能（TTL、EXPIRE），时间轮定时删除策略+惰性删除策略
 - [x] 无阻塞Keys命令
 - [x] Bitmap数据结构
+- [x] AOF持久化（fsync：暂不支持Always）
+- [ ] AOF重写（Rewrite）
 - [ ] LRU内存淘汰策略
 - [ ] Geo地理位置
 - [ ] RDB持久化
-- [ ] AOF持久化和AOF重写
 - [ ] 发布订阅功能
 - [ ] multi事务功能
 
@@ -50,6 +51,14 @@ RediGO是用Go语言实现的Redis服务器。通过该项目学习Redis原理�
 port 6399
 # 数据库数量（默认16）
 databases 16
+
+# 是否开启AOF持久化（默认关闭）
+appendonly true
+# AOF持久化文件名
+appendfilename appendonly.aof
+# aof fsync策略（暂时不支持Always）
+appendfsync everysec
+
 # 启用过期key定时删除（默认关闭，避免定时任务占用CPU）
 useScheduleExpire true
 ```
