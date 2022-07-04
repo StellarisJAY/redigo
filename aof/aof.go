@@ -1,11 +1,15 @@
 package aof
 
 import (
+	"bufio"
+	"io"
 	"log"
 	"os"
 	"redigo/config"
 	"redigo/interface/database"
+	"redigo/redis/parser"
 	"redigo/redis/protocol"
+	"redigo/tcp"
 	"strconv"
 	"time"
 )
@@ -37,6 +41,12 @@ func NewAofHandler(db database.DB) (*Handler, error) {
 	}
 	handler.aofFile = file
 	log.Println("AOF enabled, aof file: ", config.Properties.AofFileName)
+	start := time.Now()
+	err = handler.loadAof()
+	if err != nil {
+		panic(err)
+	}
+	log.Println("AOF loaded, time used: ", time.Now().Sub(start).Milliseconds(), "ms")
 	go func() {
 		handler.handle()
 	}()
@@ -77,4 +87,31 @@ func (h *Handler) handlePayload(p Payload) {
 	if err != nil {
 		log.Println(err)
 	}
+}
+
+func (h *Handler) loadAof() error {
+	reader := bufio.NewReader(h.aofFile)
+	// a fake connection, to hold the database index
+	fakeConn := tcp.Connection{}
+	for {
+		cmd, err := parser.Parse(reader)
+		if err != nil {
+			if err != io.EOF {
+				return err
+			}
+			break
+		}
+		// change database index
+		if cmd.Name() == "select" {
+			idx, err := strconv.Atoi(string(cmd.Args()[0]))
+			if err != nil {
+				continue
+			}
+			fakeConn.SelectDB(idx)
+		}
+		// bind the fake connection with command and execute command
+		cmd.BindConnection(&fakeConn)
+		h.db.Execute(*cmd)
+	}
+	return nil
 }
