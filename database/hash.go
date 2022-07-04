@@ -44,6 +44,7 @@ func execHSet(db *SingleDB, command redis.Command) *protocol.Reply {
 		hash.Put(k, val)
 		i += 2
 	}
+	db.addAof(command.Parts)
 	// return how many key-value pairs has been put
 	return protocol.NewNumberReply(i / 2)
 }
@@ -82,6 +83,7 @@ func execHDel(db *SingleDB, command redis.Command) *protocol.Reply {
 		for _, del := range delKeys {
 			count += hash.Remove(string(del))
 		}
+		db.addAof(command.Parts)
 		return protocol.NewNumberReply(count)
 	}
 	return protocol.NewNumberReply(0)
@@ -193,7 +195,11 @@ func execHSetNX(db *SingleDB, command redis.Command) *protocol.Reply {
 	if err != nil {
 		return protocol.NewErrorReply(err)
 	}
-	return protocol.NewNumberReply(hash.PutIfAbsent(string(args[1]), args[2]))
+	absent := hash.PutIfAbsent(string(args[1]), args[2])
+	if absent == 1 {
+		db.addAof(command.Parts)
+	}
+	return protocol.NewNumberReply(absent)
 }
 
 func execHIncrBy(db *SingleDB, command redis.Command) *protocol.Reply {
@@ -225,6 +231,7 @@ func execHIncrBy(db *SingleDB, command redis.Command) *protocol.Reply {
 	}
 	result += delta
 	hash.Put(string(args[1]), []byte(strconv.Itoa(result)))
+	db.addAof(command.Parts)
 	return protocol.NewNumberReply(result)
 }
 
