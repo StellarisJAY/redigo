@@ -3,6 +3,7 @@ package database
 import (
 	"log"
 	"redigo/datastruct/bitmap"
+	"redigo/interface/database"
 	"redigo/redis"
 	"redigo/redis/protocol"
 	"strconv"
@@ -67,7 +68,7 @@ func executeSet(db *SingleDB, command redis.Command) *protocol.Reply {
 		}
 	}
 
-	entry := &Entry{Data: value}
+	entry := &database.Entry{Data: value}
 	var result int
 	switch policy {
 	case defaultPolicy:
@@ -113,7 +114,7 @@ func executeSetNX(db *SingleDB, command redis.Command) *protocol.Reply {
 	}
 	key := string(args[0])
 	value := args[1]
-	entry := &Entry{Data: value}
+	entry := &database.Entry{Data: value}
 	exists := db.data.PutIfAbsent(key, entry)
 	if exists != 0 {
 		db.CancelTTL(key)
@@ -131,7 +132,7 @@ func executeAppend(db *SingleDB, command redis.Command) *protocol.Reply {
 	v, exists := db.data.Get(key)
 	var length int
 	if exists {
-		entry := v.(*Entry)
+		entry := v.(*database.Entry)
 		// check if entry is string type
 		if !isString(*entry) {
 			return protocol.NewErrorReply(protocol.WrongTypeOperationError)
@@ -146,7 +147,7 @@ func executeAppend(db *SingleDB, command redis.Command) *protocol.Reply {
 		length = len(value)
 	} else {
 		// key doesn't exist.
-		entry := &Entry{Data: appendValue}
+		entry := &database.Entry{Data: appendValue}
 		_ = db.data.Put(key, entry)
 		length = len(appendValue)
 	}
@@ -203,7 +204,7 @@ func executeDecrby(db *SingleDB, command redis.Command) *protocol.Reply {
 func add(db *SingleDB, key string, delta int) *protocol.Reply {
 	v, exists := db.data.Get(key)
 	if exists {
-		entry := v.(*Entry)
+		entry := v.(*database.Entry)
 		// check entry type
 		if !isString(*entry) {
 			return protocol.NewErrorReply(protocol.WrongTypeOperationError)
@@ -219,7 +220,7 @@ func add(db *SingleDB, key string, delta int) *protocol.Reply {
 			return protocol.NewNumberReply(val)
 		}
 	} else {
-		entry := &Entry{Data: []byte(strconv.Itoa(delta))}
+		entry := &database.Entry{Data: []byte(strconv.Itoa(delta))}
 		db.data.Put(key, entry)
 		return protocol.NewNumberReply(delta)
 	}
@@ -244,7 +245,7 @@ func execSetBit(db *SingleDB, command redis.Command) *protocol.Reply {
 	if !exists {
 		// create a new bitmap if not exist
 		bm = bitmap.New()
-		entry := &Entry{Data: bm}
+		entry := &database.Entry{Data: bm}
 		db.data.Put(string(args[0]), entry)
 	}
 	original := bm.SetBit(offset, byte(bit))
@@ -296,7 +297,7 @@ func getBitMap(db *SingleDB, key string) (*bitmap.BitMap, bool, error) {
 	return entry.Data.(*bitmap.BitMap), true, nil
 }
 
-func isString(entry Entry) bool {
+func isString(entry database.Entry) bool {
 	switch entry.Data.(type) {
 	case []byte:
 		return true
@@ -304,7 +305,7 @@ func isString(entry Entry) bool {
 	return false
 }
 
-func isBitMap(entry Entry) bool {
+func isBitMap(entry database.Entry) bool {
 	switch entry.Data.(type) {
 	case *bitmap.BitMap:
 		return true

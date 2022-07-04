@@ -6,6 +6,7 @@ import (
 	"redigo/config"
 	"redigo/datastruct/dict"
 	"redigo/datastruct/lock"
+	"redigo/interface/database"
 	"redigo/redis"
 	"redigo/redis/protocol"
 	"redigo/util/timewheel"
@@ -128,12 +129,12 @@ func (db *SingleDB) expireIfNeeded(key string) bool {
 }
 
 // get the data entry holding the key's value. Checking key's existence and expire time
-func (db *SingleDB) getEntry(key string) (entry *Entry, exists bool) {
+func (db *SingleDB) getEntry(key string) (entry *database.Entry, exists bool) {
 	v, ok := db.data.Get(key)
 	if !ok || db.expireIfNeeded(key) {
 		return nil, false
 	}
-	return v.(*Entry), true
+	return v.(*database.Entry), true
 }
 
 func (db *SingleDB) Close() {

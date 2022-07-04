@@ -5,6 +5,7 @@ import (
 	"redigo/datastruct/list"
 	"redigo/datastruct/set"
 	"redigo/datastruct/zset"
+	"redigo/interface/database"
 	"redigo/redis"
 	"redigo/redis/protocol"
 	"redigo/util/pattern"
@@ -164,7 +165,7 @@ func execType(db *SingleDB, command redis.Command) *protocol.Reply {
 	return protocol.NewSingleStringReply(result)
 }
 
-func typeOf(entry Entry) string {
+func typeOf(entry database.Entry) string {
 	switch entry.Data.(type) {
 	case dict.Dict:
 		return "hash"

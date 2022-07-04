@@ -3,6 +3,7 @@ package database
 import (
 	"math"
 	"redigo/datastruct/zset"
+	"redigo/interface/database"
 	"redigo/redis"
 	"redigo/redis/protocol"
 	"strconv"
@@ -326,7 +327,7 @@ func parseInterval(arg1, arg2 string) (min, max float64, lOpen, rOpen bool, err 
 	return
 }
 
-func isSortedSet(entry Entry) bool {
+func isSortedSet(entry database.Entry) bool {
 	switch entry.Data.(type) {
 	case *zset.SortedSet:
 		return true
@@ -350,7 +351,7 @@ func getOrInitSortedSet(db *SingleDB, key string) (*zset.SortedSet, error) {
 	entry, exists := db.getEntry(key)
 	if !exists {
 		zs := zset.NewSortedSet()
-		db.data.Put(key, &Entry{Data: zs})
+		db.data.Put(key, &database.Entry{Data: zs})
 		return zs, nil
 	} else {
 		if isSortedSet(*entry) {

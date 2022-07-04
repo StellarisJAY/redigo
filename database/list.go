@@ -2,6 +2,7 @@ package database
 
 import (
 	"redigo/datastruct/list"
+	"redigo/interface/database"
 	"redigo/redis"
 	"redigo/redis/protocol"
 	"reflect"
@@ -185,7 +186,7 @@ func execRPopLPush(db *SingleDB, command redis.Command) *protocol.Reply {
 	return protocol.NewBulkValueReply(element)
 }
 
-func isLinkedList(entry *Entry) bool {
+func isLinkedList(entry *database.Entry) bool {
 	return reflect.TypeOf(entry.Data).String() == "*list.LinkedList"
 }
 
@@ -194,7 +195,7 @@ func getOrInitLinkedList(db *SingleDB, key string) (*list.LinkedList, error) {
 	var linkedList *list.LinkedList
 	if !exists {
 		linkedList = list.NewLinkedList()
-		entry = &Entry{Data: linkedList}
+		entry = &database.Entry{Data: linkedList}
 		db.data.Put(key, entry)
 		return linkedList, nil
 	} else {

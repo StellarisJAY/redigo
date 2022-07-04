@@ -2,6 +2,7 @@ package database
 
 import (
 	"redigo/datastruct/dict"
+	"redigo/interface/database"
 	"redigo/redis"
 	"redigo/redis/protocol"
 	"strconv"
@@ -271,7 +272,7 @@ func execHVals(db *SingleDB, command redis.Command) *protocol.Reply {
 	return protocol.EmptyListReply
 }
 
-func isHash(entry *Entry) bool {
+func isHash(entry *database.Entry) bool {
 	switch entry.Data.(type) {
 	case *dict.SimpleDict:
 		return true
@@ -290,7 +291,7 @@ func getOrInitHash(db *SingleDB, key string) (dict.Dict, error) {
 		return entry.Data.(dict.Dict), nil
 	} else {
 		hash := dict.NewSimpleDict()
-		db.data.Put(key, &Entry{Data: hash})
+		db.data.Put(key, &database.Entry{Data: hash})
 		return hash, nil
 	}
 }

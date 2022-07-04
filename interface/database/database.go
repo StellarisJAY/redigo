@@ -14,3 +14,10 @@ type DB interface {
 	ExecuteLoop() error
 	Execute(command redis.Command) *protocol.Reply
 }
+
+/*
+	Entry holds a data of a key
+*/
+type Entry struct {
+	Data interface{}
+}

@@ -7,13 +7,6 @@ import (
 	"strconv"
 )
 
-/*
-	Entry holds a data of a key
-*/
-type Entry struct {
-	Data     interface{}
-	expireAt int64
-}
 type MultiDB struct {
 	dbSet     []database.DB
 	cmdChan   chan redis.Command

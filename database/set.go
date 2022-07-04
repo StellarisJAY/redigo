@@ -2,6 +2,7 @@ package database
 
 import (
 	"redigo/datastruct/set"
+	"redigo/interface/database"
 	"redigo/redis"
 	"redigo/redis/protocol"
 	"reflect"
@@ -186,7 +187,7 @@ func execSDiffStore(db *SingleDB, command redis.Command) *protocol.Reply {
 	for _, value := range diff {
 		dest.Add(value)
 	}
-	db.data.Put(string(args[0]), &Entry{Data: dest})
+	db.data.Put(string(args[0]), &database.Entry{Data: dest})
 	return protocol.NewStringArrayReply(diff)
 }
 
@@ -235,7 +236,7 @@ func execSInterStore(db *SingleDB, command redis.Command) *protocol.Reply {
 	for _, value := range inter {
 		dest.Add(value)
 	}
-	db.data.Put(string(args[0]), &Entry{Data: dest})
+	db.data.Put(string(args[0]), &database.Entry{Data: dest})
 	return protocol.NewStringArrayReply(inter)
 }
 
@@ -281,7 +282,7 @@ func getOrCreateSet(db *SingleDB, key string) (*set.Set, error) {
 	entry, exists := db.getEntry(key)
 	if !exists {
 		s := set.NewSet()
-		entry = &Entry{Data: s}
+		entry = &database.Entry{Data: s}
 		db.data.Put(key, entry)
 		return s, nil
 	} else {
@@ -305,6 +306,6 @@ func getSet(db *SingleDB, key string) (*set.Set, error) {
 	}
 }
 
-func isSet(entry Entry) bool {
+func isSet(entry database.Entry) bool {
 	return reflect.TypeOf(entry.Data).String() == "*set.Set"
 }
