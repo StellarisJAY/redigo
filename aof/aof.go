@@ -33,7 +33,7 @@ func NewAofHandler(db database.DB) (*Handler, error) {
 	handler.aofChan = make(chan Payload, 1<<16)
 	handler.closeChan = make(chan struct{})
 	// create a ticker for EverySec AOF
-	if config.Properties.AppendFsync == config.AofEverySec {
+	if config.Properties.AppendFsync == config.FsyncEverySec {
 		handler.ticker = time.NewTicker(1 * time.Second)
 	}
 	// open append file
@@ -50,11 +50,11 @@ func NewAofHandler(db database.DB) (*Handler, error) {
 	}
 	log.Println("AOF loaded, time used: ", time.Now().Sub(start).Milliseconds(), "ms")
 	go func() {
-		// fsync policies: always or every sec
-		if config.Properties.AppendFsync == config.AofAlways {
-			handler.handleAlways()
-		} else {
+		// fsync policy every sec
+		if config.Properties.AppendFsync == config.FsyncEverySec {
 			handler.handleEverySec()
+		} else {
+			handler.handle()
 		}
 	}()
 	return handler, nil
@@ -89,7 +89,7 @@ func (h *Handler) handleEverySec() {
 }
 
 // handle func of AOF
-func (h *Handler) handleAlways() {
+func (h *Handler) handle() {
 	for {
 		select {
 		case <-h.closeChan:

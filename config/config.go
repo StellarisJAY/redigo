@@ -22,8 +22,8 @@ type ServerProperties struct {
 var Properties *ServerProperties
 
 const (
-	AofEverySec = "everysec"
-	AofAlways   = "always"
+	FsyncEverySec = "everysec"
+	FsyncNo       = "no"
 )
 
 func init() {
@@ -32,7 +32,7 @@ func init() {
 		Databases:         16,
 		AppendOnly:        false,
 		UseScheduleExpire: false,
-		AppendFsync:       AofAlways,
+		AppendFsync:       FsyncNo,
 		AofFileName:       "appendonly.aof",
 	}
 }
