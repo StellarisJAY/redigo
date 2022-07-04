@@ -73,24 +73,36 @@ CPU：AMD EPYC 7K62 2.6GHz
 RediGO:
 
 ```
-$ redis-benchmark -n 200000 -r 100000 -t get,set,lpush,lpop,hset,sadd -p 6380 -q
-SET: 85360.65 requests per second
-GET: 83507.30 requests per second
-LPUSH: 84925.69 requests per second
-LPOP: 84853.62 requests per second
-SADD: 85763.29 requests per second
-HSET: 83263.95 requests per second
+$ redis-benchmark -n 200000 -r 200000 -q -t set,get,incr,lpush,lpop,rpush,rpop,hset,sadd,spop,lrange_100 -p 6380
+SET: 82610.49 requests per second
+GET: 82068.12 requests per second
+INCR: 82101.80 requests per second
+LPUSH: 83507.30 requests per second
+RPUSH: 83402.84 requests per second
+LPOP: 84709.87 requests per second
+RPOP: 83682.01 requests per second
+SADD: 83194.67 requests per second
+HSET: 82576.38 requests per second
+SPOP: 82781.46 requests per second
+LPUSH (needed to benchmark LRANGE): 82747.20 requests per second
+LRANGE_100 (first 100 elements): 41493.77 requests per second
 ```
 
 原版Redis：
 
 ```
-$ redis-benchmark -n 200000 -r 100000 -t get,set,lpush,lpop,hset,sadd -p 6379 -q
-SET: 109649.12 requests per second
-GET: 111669.46 requests per second
-LPUSH: 113765.64 requests per second
-LPOP: 109950.52 requests per second
-SADD: 109051.26 requests per second
-HSET: 113507.38 requests per second
+$ redis-benchmark -n 200000 -r 200000 -q -t set,get,incr,lpush,lpop,rpush,rpop,hset,sadd,spop,lrange_100 -p 6379
+SET: 108459.87 requests per second
+GET: 108636.61 requests per second
+INCR: 107816.71 requests per second
+LPUSH: 106382.98 requests per second
+RPUSH: 107238.60 requests per second
+LPOP: 112359.55 requests per second
+RPOP: 109110.75 requests per second
+SADD: 108049.70 requests per second
+HSET: 113442.99 requests per second
+SPOP: 115473.45 requests per second
+LPUSH (needed to benchmark LRANGE): 113636.37 requests per second
+LRANGE_100 (first 100 elements): 62873.31 requests per second
 ```
 
