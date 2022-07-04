@@ -87,6 +87,7 @@ func execDel(db *SingleDB, command redis.Command) *protocol.Reply {
 		deleted := db.data.Remove(key)
 		if deleted == 1 {
 			db.CancelTTL(key)
+			db.addAof(command.Parts)
 		}
 		result += deleted
 	}
@@ -120,6 +121,9 @@ func execPersist(db *SingleDB, command redis.Command) *protocol.Reply {
 		return protocol.NewNumberReply(0)
 	}
 	removed := db.CancelTTL(key)
+	if removed == 1 {
+		db.addAof(command.Parts)
+	}
 	return protocol.NewNumberReply(removed)
 }
 
