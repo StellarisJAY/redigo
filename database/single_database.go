@@ -66,6 +66,18 @@ func (db *SingleDB) Execute(command redis.Command) *protocol.Reply {
 	}
 }
 
+func (db *SingleDB) ForEach(dbIdx int, fun func(key string, entry *database.Entry, expire *time.Time) bool) {
+	db.data.ForEach(func(key string, value interface{}) bool {
+		entry := value.(*database.Entry)
+		ttl, ok := db.ttlMap.Get(key)
+		if ok {
+			return fun(key, entry, ttl.(*time.Time))
+		} else {
+			return fun(key, entry, nil)
+		}
+	})
+}
+
 // Expire set a key's expire time
 func (db *SingleDB) Expire(key string, ttl time.Duration) {
 	expireTime := time.Now().Add(ttl)

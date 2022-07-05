@@ -88,6 +88,12 @@ func (m *MultiDB) Execute(command redis.Command) *protocol.Reply {
 	}
 }
 
+func (m *MultiDB) ForEach(dbIdx int, fun func(key string, entry *database.Entry, expire *time.Time) bool) {
+	if dbIdx < len(m.dbSet) {
+		m.dbSet[dbIdx].ForEach(dbIdx, fun)
+	}
+}
+
 func (m *MultiDB) execSelectDB(command redis.Command) *protocol.Reply {
 	args := command.Args()
 	if len(args) != 1 {
