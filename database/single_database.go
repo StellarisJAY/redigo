@@ -81,9 +81,27 @@ func (db *SingleDB) ForEach(dbIdx int, fun func(key string, entry *database.Entr
 // Expire set a key's expire time
 func (db *SingleDB) Expire(key string, ttl time.Duration) {
 	expireTime := time.Now().Add(ttl)
-	db.ttlMap.Put(key, expireTime)
+	db.ttlMap.Put(key, &expireTime)
 	// if server enabled scheduler for expiring
 	if config.Properties.UseScheduleExpire {
+		// schedule auto remove in time wheel
+		timewheel.ScheduleDelayed(ttl, "expire_"+key, func() {
+			_, exists := db.ttlMap.Get(key)
+			if !exists {
+				return
+			}
+			db.ttlMap.Remove(key)
+			db.data.Remove(key)
+			log.Println("Expired Key removed: ", key)
+		})
+	}
+}
+
+func (db *SingleDB) ExpireAt(key string, expire *time.Time) {
+	db.ttlMap.Put(key, expire)
+	// if server enabled scheduler for expiring
+	if config.Properties.UseScheduleExpire {
+		ttl := expire.Sub(time.Now())
 		// schedule auto remove in time wheel
 		timewheel.ScheduleDelayed(ttl, "expire_"+key, func() {
 			_, exists := db.ttlMap.Get(key)
@@ -100,7 +118,7 @@ func (db *SingleDB) Expire(key string, ttl time.Duration) {
 func (db *SingleDB) TTL(key string) time.Duration {
 	v, exists := db.ttlMap.Get(key)
 	if exists {
-		expireTime := v.(time.Time)
+		expireTime := v.(*time.Time)
 		ttl := expireTime.Sub(time.Now())
 		if ttl < 0 {
 			return 0
