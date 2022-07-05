@@ -62,6 +62,7 @@ func NewMultiDB(dbSize, cmdChanSize int) *MultiDB {
 	return db
 }
 
+// Register MultiDB commands here
 func (m *MultiDB) initCommandExecutors() {
 	m.executors["command"] = func(command redis.Command) *protocol.Reply {
 		return protocol.OKReply
@@ -69,6 +70,8 @@ func (m *MultiDB) initCommandExecutors() {
 	m.executors["select"] = m.execSelectDB
 	m.executors["ping"] = m.execPing
 	m.executors["bgrewriteaof"] = m.execBGRewriteAOF
+	m.executors["dbsize"] = m.execDBSize
+	m.executors["flushdb"] = m.execFlushDB
 }
 
 func (m *MultiDB) SubmitCommand(command redis.Command) {
@@ -154,4 +157,25 @@ func (m *MultiDB) execBGRewriteAOF(command redis.Command) *protocol.Reply {
 		return protocol.NewErrorReply(err)
 	}
 	return protocol.NewSingleStringReply("Background append only file rewriting started")
+}
+
+func (m *MultiDB) execDBSize(command redis.Command) *protocol.Reply {
+	conn := command.Connection()
+	index := conn.DBIndex()
+	return protocol.NewNumberReply(m.Len(index))
+}
+
+func (m *MultiDB) execFlushDB(command redis.Command) *protocol.Reply {
+	conn := command.Connection()
+	index := conn.DBIndex()
+	args := command.Args()
+	if len(args) > 1 {
+		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("FLUSHDB"))
+	}
+	// check if flush in async mode
+	async := len(args) == 1 && string(args[0]) == "ASYNC"
+	m.dbSet[index].(*SingleDB).flushDB(async)
+	// add aof command
+	m.aofHandler.AddAof([][]byte{[]byte("FLUSHDB")}, index)
+	return protocol.OKReply
 }

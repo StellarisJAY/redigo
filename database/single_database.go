@@ -173,6 +173,19 @@ func (db *SingleDB) getEntry(key string) (entry *database.Entry, exists bool) {
 	return v.(*database.Entry), true
 }
 
+func (db *SingleDB) flushDB(async bool) {
+	if !async {
+		db.data.Clear()
+	} else {
+		keys := db.data.Keys()
+		go func(keys []string) {
+			for _, key := range keys {
+				db.data.Remove(key)
+			}
+		}(keys)
+	}
+}
+
 func (db *SingleDB) Close() {
 	//TODO implement me
 	panic("implement me")
