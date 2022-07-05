@@ -7,6 +7,7 @@ import (
 	"redigo/redis"
 	"redigo/redis/protocol"
 	"strconv"
+	"time"
 )
 
 type MultiDB struct {
@@ -67,6 +68,7 @@ func (m *MultiDB) initCommandExecutors() {
 	}
 	m.executors["select"] = m.execSelectDB
 	m.executors["ping"] = m.execPing
+	m.executors["bgrewriteaof"] = m.execBGRewriteAOF
 }
 
 func (m *MultiDB) SubmitCommand(command redis.Command) {
@@ -144,4 +146,12 @@ func (m *MultiDB) execPing(command redis.Command) *protocol.Reply {
 		message = string(args[0])
 	}
 	return protocol.NewSingleStringReply(message)
+}
+
+func (m *MultiDB) execBGRewriteAOF(command redis.Command) *protocol.Reply {
+	err := m.aofHandler.StartRewrite()
+	if err != nil {
+		return protocol.NewErrorReply(err)
+	}
+	return protocol.NewSingleStringReply("Background append only file rewriting started")
 }

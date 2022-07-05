@@ -16,6 +16,7 @@ var (
 	DBIndexOutOfRangeError           = errors.New("ERR DB index is out of range")
 	ValueNotFloatError               = errors.New("ERR value is not a valid float")
 	SyntaxError                      = errors.New("ERR syntax error")
+	AppendOnlyRewriteInProgressError = errors.New("ERR Background append only file rewriting already in progress")
 )
 
 func CreateWrongArgumentNumberError(command string) error {
