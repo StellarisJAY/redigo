@@ -78,6 +78,10 @@ func (db *SingleDB) ForEach(dbIdx int, fun func(key string, entry *database.Entr
 	})
 }
 
+func (db *SingleDB) Len(dbIdx int) int {
+	return db.data.Len()
+}
+
 // Expire set a key's expire time
 func (db *SingleDB) Expire(key string, ttl time.Duration) {
 	expireTime := time.Now().Add(ttl)

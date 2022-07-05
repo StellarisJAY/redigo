@@ -76,6 +76,13 @@ func (m *MultiDB) ExecuteLoop() error {
 	}
 }
 
+func (m *MultiDB) Len(dbIdx int) int {
+	if dbIdx < len(m.dbSet) {
+		return m.dbSet[dbIdx].Len(dbIdx)
+	}
+	return 0
+}
+
 func (m *MultiDB) Execute(command redis.Command) *protocol.Reply {
 	cmdName := command.Name()
 	if exec, ok := m.executors[cmdName]; ok {
