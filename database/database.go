@@ -16,6 +16,20 @@ type MultiDB struct {
 	aofHandler *aof.Handler
 }
 
+func NewTempDB(dbSize int) *MultiDB {
+	db := &MultiDB{
+		dbSet:     make([]database.DB, dbSize),
+		cmdChan:   make(chan redis.Command, 0),
+		executors: make(map[string]func(redis.Command) *protocol.Reply),
+	}
+	db.initCommandExecutors()
+	// initialize single databases in db set
+	for i := 0; i < dbSize; i++ {
+		db.dbSet[i] = NewSingleDB(i)
+	}
+	return db
+}
+
 func NewMultiDB(dbSize, cmdChanSize int) *MultiDB {
 	db := &MultiDB{
 		dbSet:     make([]database.DB, dbSize),
@@ -29,7 +43,9 @@ func NewMultiDB(dbSize, cmdChanSize int) *MultiDB {
 	}
 	// initialize AOF
 	if config.Properties.AppendOnly {
-		aofHandler, err := aof.NewAofHandler(db)
+		aofHandler, err := aof.NewAofHandler(db, func() database.DB {
+			return NewTempDB(config.Properties.Databases)
+		})
 		if err != nil {
 			panic(err)
 		}

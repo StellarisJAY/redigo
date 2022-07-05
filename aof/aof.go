@@ -11,6 +11,8 @@ import (
 	"redigo/redis/protocol"
 	"redigo/tcp"
 	"strconv"
+	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -20,31 +22,40 @@ type Payload struct {
 }
 
 type Handler struct {
-	db        database.DB
-	aofChan   chan Payload // aof command buffer, commands stored in here before writes to file
-	aofFile   *os.File
-	currentDB int          // current database index, if index changed, must append a SELECT command
-	ticker    *time.Ticker // ticker for EverySec policy
-	closeChan chan struct{}
+	db             database.DB
+	aofChan        chan Payload // aof command buffer, commands stored in here before writes to file
+	aofFileName    string
+	aofFile        *os.File
+	currentDB      int          // current database index, if index changed, must append a SELECT command
+	ticker         *time.Ticker // ticker for EverySec policy
+	closeChan      chan struct{}
+	aofLock        sync.Mutex
+	dbMaker        func() database.DB
+	rewriteStarted atomic.Value
 }
 
-func NewAofHandler(db database.DB) (*Handler, error) {
+func NewAofHandler(db database.DB, dbMaker func() database.DB) (*Handler, error) {
 	handler := &Handler{db: db}
 	handler.aofChan = make(chan Payload, 1<<16)
 	handler.closeChan = make(chan struct{})
+	handler.aofLock = sync.Mutex{}
+	handler.rewriteStarted = atomic.Value{}
+	handler.rewriteStarted.Store(false)
+	handler.dbMaker = dbMaker
 	// create a ticker for EverySec AOF
 	if config.Properties.AppendFsync == config.FsyncEverySec {
 		handler.ticker = time.NewTicker(1 * time.Second)
 	}
+	handler.aofFileName = config.Properties.AofFileName
 	// open append file
-	file, err := os.OpenFile(config.Properties.AofFileName, os.O_APPEND|os.O_CREATE|os.O_RDWR, 0600)
+	file, err := os.OpenFile(handler.aofFileName, os.O_APPEND|os.O_CREATE|os.O_RDWR, 0666)
 	if err != nil {
 		return nil, err
 	}
 	handler.aofFile = file
 	log.Println("AOF enabled, aof file: ", config.Properties.AofFileName)
 	start := time.Now()
-	err = handler.loadAof()
+	err = handler.loadAof(-1)
 	if err != nil {
 		panic(err)
 	}
@@ -73,16 +84,19 @@ func (h *Handler) handleEverySec() {
 	for {
 		select {
 		case <-h.closeChan:
+			h.aofLock.Lock()
 			// receive close signal, break handle loop
 			h.handleRemaining(len(h.aofChan))
+			h.aofLock.Unlock()
 			break
 		case <-h.ticker.C:
+			h.aofLock.Lock()
 			// handle remaining commands in aof queue every sec
 			remaining := len(h.aofChan)
 			if remaining > 0 {
 				h.handleRemaining(len(h.aofChan))
-				log.Println("Aof written, cmd count: ", remaining)
 			}
+			h.aofLock.Unlock()
 			continue
 		}
 	}
@@ -93,11 +107,15 @@ func (h *Handler) handle() {
 	for {
 		select {
 		case <-h.closeChan:
+			h.aofLock.Lock()
 			// receive close signal, break handle loop
 			h.handleRemaining(len(h.aofChan))
+			h.aofLock.Unlock()
 			break
 		case payload := <-h.aofChan:
+			h.aofLock.Lock()
 			h.handlePayload(payload)
+			h.aofLock.Unlock()
 		}
 	}
 }
@@ -130,8 +148,22 @@ func (h *Handler) handlePayload(p Payload) {
 	}
 }
 
-func (h *Handler) loadAof() error {
-	reader := bufio.NewReader(h.aofFile)
+func (h *Handler) loadAof(maxBytes int64) error {
+	file, err := os.Open(h.aofFileName)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+	defer func(file *os.File) {
+		_ = file.Close()
+	}(file)
+	var r io.Reader
+	if maxBytes > 0 {
+		r = io.LimitReader(file, maxBytes)
+	} else {
+		r = file
+	}
+	reader := bufio.NewReader(r)
 	// a fake connection, to hold the database index
 	fakeConn := tcp.Connection{}
 	for {
@@ -150,6 +182,7 @@ func (h *Handler) loadAof() error {
 			}
 			fakeConn.SelectDB(idx)
 		}
+
 		// bind the fake connection with command and execute command
 		cmd.BindConnection(&fakeConn)
 		h.db.Execute(*cmd)
