@@ -21,6 +21,7 @@ func init() {
 	RegisterCommandExecutor("persist", execPersist)
 	RegisterCommandExecutor("expire", execExpire)
 	RegisterCommandExecutor("type", execType)
+	RegisterCommandExecutor("pexpireat", execPExpireAt)
 }
 
 func execKeys(db *SingleDB, command redis.Command, keys []string) *protocol.Reply {
@@ -167,6 +168,25 @@ func execType(db *SingleDB, command redis.Command) *protocol.Reply {
 		result = typeOf(*entry)
 	}
 	return protocol.NewSingleStringReply(result)
+}
+
+func execPExpireAt(db *SingleDB, command redis.Command) *protocol.Reply {
+	args := command.Args()
+	if len(args) != 3 {
+		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("PEXPIREAT"))
+	}
+	expireAt, err := strconv.ParseInt(string(args[2]), 0, 64)
+	if err != nil {
+		return protocol.NewErrorReply(protocol.HashValueNotIntegerError)
+	}
+	_, exists := db.getEntry(string(args[0]))
+	if exists {
+		expireTime := time.UnixMilli(expireAt)
+		db.ExpireAt(string(args[0]), &expireTime)
+		return protocol.NewNumberReply(1)
+	} else {
+		return protocol.NewNumberReply(0)
+	}
 }
 
 func typeOf(entry database.Entry) string {
