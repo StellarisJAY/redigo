@@ -175,7 +175,7 @@ func (m *MultiDB) execFlushDB(command redis.Command) *protocol.Reply {
 	// check if flush in async mode
 	async := len(args) == 1 && string(args[0]) == "ASYNC"
 	m.dbSet[index].(*SingleDB).flushDB(async)
-	// add aof command
-	m.aofHandler.AddAof([][]byte{[]byte("FLUSHDB")}, index)
+	// use single database to write AOF
+	m.dbSet[index].(*SingleDB).addAof([][]byte{[]byte("FLUSHDB")})
 	return protocol.OKReply
 }
