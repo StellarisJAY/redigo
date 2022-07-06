@@ -81,19 +81,55 @@ func TestSortedSet_Range(t *testing.T) {
 
 func TestSortedSet_CountBetween(t *testing.T) {
 	set := initTest(100)
-	count := set.CountBetween(0, 100)
-	if count != 100 {
+	count := set.CountBetween(0, 100, true, true)
+	if count != 99 {
 		t.Log("Count between 0 and 100 failed, count: ", count)
 		t.Fail()
 	}
-	count = set.CountBetween(10.5, 20)
+	count = set.CountBetween(10.5, 20, false, false)
 	if count != 10 {
 		t.Log("Count between 10.5 and 20 failed, count: ", count)
 		t.Fail()
 	}
-	count = set.CountBetween(90.5, 105)
+	count = set.CountBetween(90.5, 105, true, false)
 	if count != 10 {
 		t.Log("Count between 90.5 and 105 failed, count: ", count)
 		t.Fail()
+	}
+}
+
+// Benchmark ZADD
+func BenchmarkSortedSet_Add(b *testing.B) {
+	set := NewSortedSet()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		set.Add(strconv.Itoa(i), float64(i))
+	}
+}
+
+// Benchmark ZRANK
+func BenchmarkSortedSet_Rank(b *testing.B) {
+	set := NewSortedSet()
+	members := make([]string, b.N)
+	for i := 0; i < b.N; i++ {
+		members[i] = strconv.Itoa(i)
+		set.Add(members[i], float64(i))
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = set.Rank(members[i])
+	}
+}
+
+func BenchmarkSortedSet_GetScore(b *testing.B) {
+	set := NewSortedSet()
+	members := make([]string, b.N)
+	for i := 0; i < b.N; i++ {
+		members[i] = strconv.Itoa(i)
+		set.Add(members[i], float64(i))
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		set.GetScore(members[i])
 	}
 }

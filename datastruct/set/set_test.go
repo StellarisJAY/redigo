@@ -1,6 +1,7 @@
 package set
 
 import (
+	"strconv"
 	"testing"
 )
 
@@ -143,6 +144,92 @@ func TestSet_Inter2(t *testing.T) {
 	}
 }
 
-func TestSet_Union(t *testing.T) {
+func BenchmarkSet_Add(b *testing.B) {
+	s := NewSet()
+	members := make([]string, b.N)
+	for i := 0; i < b.N; i++ {
+		members[i] = strconv.Itoa(i)
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		s.Add(members[i])
+	}
+}
 
+func BenchmarkSet_Has(b *testing.B) {
+	s := NewSet()
+	members := make([]string, b.N)
+	for i := 0; i < b.N; i++ {
+		members[i] = strconv.Itoa(i)
+	}
+	for i := 0; i < b.N; i++ {
+		s.Add(members[i])
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		s.Has(members[i])
+	}
+}
+
+func BenchmarkSet_Remove(b *testing.B) {
+	s := NewSet()
+	members := make([]string, b.N)
+	for i := 0; i < b.N; i++ {
+		members[i] = strconv.Itoa(i)
+	}
+	for i := 0; i < b.N; i++ {
+		s.Add(members[i])
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		s.Remove(members[i])
+	}
+}
+
+func BenchmarkSet_Diff(b *testing.B) {
+	s1 := NewSet()
+	for i := 1; i <= 1000; i += 2 {
+		s1.Add(strconv.Itoa(i))
+	}
+	s2 := NewSet()
+	for i := 1; i <= 1000; i++ {
+		s2.Add(strconv.Itoa(i))
+	}
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		s2.Diff(s1)
+	}
+}
+
+func BenchmarkSet_Inter(b *testing.B) {
+	s1 := NewSet()
+	for i := 1; i <= 1000; i += 2 {
+		s1.Add(strconv.Itoa(i))
+	}
+	s2 := NewSet()
+	for i := 1; i <= 1000; i++ {
+		s2.Add(strconv.Itoa(i))
+	}
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		s1.Inter(s2)
+	}
+}
+
+func BenchmarkSet_Union(b *testing.B) {
+	s1 := NewSet()
+	for i := 1; i <= 1000; i += 2 {
+		s1.Add(strconv.Itoa(i))
+	}
+	s2 := NewSet()
+	for i := 2; i <= 1000; i += 2 {
+		s2.Add(strconv.Itoa(i))
+	}
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		s1.Union(s2)
+	}
 }
