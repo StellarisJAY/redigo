@@ -10,19 +10,19 @@ import (
 )
 
 func init() {
-	RegisterCommandExecutor("lpush", execLPush)
-	RegisterCommandExecutor("lpop", execLPop)
-	RegisterCommandExecutor("rpush", execRPush)
-	RegisterCommandExecutor("rpop", execRPop)
-	RegisterCommandExecutor("lrange", execLRange)
-	RegisterCommandExecutor("lindex", execLIndex)
-	RegisterCommandExecutor("llen", execLLen)
-	RegisterCommandExecutor("rpoplpush", execRPopLPush)
+	RegisterCommandExecutor("lpush", execLPush, -3)
+	RegisterCommandExecutor("lpop", execLPop, 1)
+	RegisterCommandExecutor("rpush", execRPush, -3)
+	RegisterCommandExecutor("rpop", execRPop, 1)
+	RegisterCommandExecutor("lrange", execLRange, 3)
+	RegisterCommandExecutor("lindex", execLIndex, 2)
+	RegisterCommandExecutor("llen", execLLen, 1)
+	RegisterCommandExecutor("rpoplpush", execRPopLPush, 2)
 }
 
 func execLPush(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) < 2 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("lpush"))
 	}
 	linkedList, err := getOrInitLinkedList(db, string(args[0]))
@@ -38,7 +38,7 @@ func execLPush(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func execLPop(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) != 1 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("lpush"))
 	}
 	linkedList, err := getLinkedList(db, string(args[0]))
@@ -59,7 +59,7 @@ func execLPop(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func execRPush(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) < 2 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("rpush"))
 	}
 	linkedList, err := getOrInitLinkedList(db, string(args[0]))
@@ -75,7 +75,7 @@ func execRPush(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func execRPop(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) != 1 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("rpop"))
 	}
 	linkedList, err := getLinkedList(db, string(args[0]))
@@ -95,7 +95,7 @@ func execRPop(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func execLRange(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) != 3 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("lrange"))
 	}
 	// parse start index and end index
@@ -125,7 +125,7 @@ func execLRange(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func execLIndex(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) != 2 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("LINDEX"))
 	}
 	// check index arg
@@ -154,7 +154,7 @@ func execLIndex(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func execLLen(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) != 1 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("LLEN"))
 	}
 	// get linked list data structure
@@ -170,7 +170,7 @@ func execLLen(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func execRPopLPush(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) != 2 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("RPopLPush"))
 	}
 	srcList, err1 := getLinkedList(db, string(args[0]))

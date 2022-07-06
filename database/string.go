@@ -19,21 +19,21 @@ const (
 )
 
 func init() {
-	RegisterCommandExecutor("set", executeSet)
-	RegisterCommandExecutor("get", executeGet)
-	RegisterCommandExecutor("setnx", executeSetNX)
-	RegisterCommandExecutor("append", executeAppend)
-	RegisterCommandExecutor("incr", executeIncr)
-	RegisterCommandExecutor("decr", executeDecr)
-	RegisterCommandExecutor("incrby", executeIncrby)
-	RegisterCommandExecutor("decrby", executeDecrby)
-	RegisterCommandExecutor("setbit", execSetBit)
-	RegisterCommandExecutor("getbit", execGetBit)
+	RegisterCommandExecutor("set", executeSet, -2)
+	RegisterCommandExecutor("get", executeGet, 1)
+	RegisterCommandExecutor("setnx", executeSetNX, 2)
+	RegisterCommandExecutor("append", executeAppend, 2)
+	RegisterCommandExecutor("incr", executeIncr, 1)
+	RegisterCommandExecutor("decr", executeDecr, 1)
+	RegisterCommandExecutor("incrby", executeIncrby, 2)
+	RegisterCommandExecutor("decrby", executeDecrby, 2)
+	RegisterCommandExecutor("setbit", execSetBit, 3)
+	RegisterCommandExecutor("getbit", execGetBit, 2)
 }
 
 func executeSet(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) < 2 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("set"))
 	}
 	key := string(args[0])
@@ -100,7 +100,7 @@ func executeSet(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func executeGet(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if args == nil || len(args) == 0 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("get"))
 	}
 	result, exists, err := getString(db, string(args[0]))
@@ -115,7 +115,7 @@ func executeGet(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func executeSetNX(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) < 2 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("setnx"))
 	}
 	key := string(args[0])
@@ -136,7 +136,7 @@ func executeSetNX(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func executeAppend(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) < 2 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("append"))
 	}
 	key := string(args[0])
@@ -170,7 +170,7 @@ func executeAppend(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func executeIncr(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) != 1 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("incr"))
 	}
 	key := string(args[0])
@@ -179,7 +179,7 @@ func executeIncr(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func executeDecr(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) != 1 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("decr"))
 	}
 	key := string(args[0])
@@ -188,7 +188,7 @@ func executeDecr(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func executeIncrby(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) != 2 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("incrby"))
 	}
 	key := string(args[0])
@@ -202,7 +202,7 @@ func executeIncrby(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func executeDecrby(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) != 2 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("decrby"))
 	}
 	key := string(args[0])
@@ -242,7 +242,7 @@ func add(db *SingleDB, key string, delta int) *protocol.Reply {
 
 func execSetBit(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) != 3 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("SETBIT"))
 	}
 	// parse offset and bit number
@@ -268,7 +268,7 @@ func execSetBit(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func execGetBit(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) != 2 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("GETBIT"))
 	}
 	// check offset number

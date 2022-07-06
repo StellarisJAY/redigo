@@ -16,20 +16,20 @@ var (
 )
 
 func init() {
-	RegisterCommandExecutor("zadd", execZAdd)
-	RegisterCommandExecutor("zscore", execZScore)
-	RegisterCommandExecutor("zrem", execZRem)
-	RegisterCommandExecutor("zrank", execZRank)
-	RegisterCommandExecutor("zpopmin", execPopMin)
-	RegisterCommandExecutor("zpopmax", execPopMax)
-	RegisterCommandExecutor("zcard", execZCard)
-	RegisterCommandExecutor("zrange", execZRange)
-	RegisterCommandExecutor("zrangebyscore", execZRangeByScore)
+	RegisterCommandExecutor("zadd", execZAdd, -3)
+	RegisterCommandExecutor("zscore", execZScore, 2)
+	RegisterCommandExecutor("zrem", execZRem, -3)
+	RegisterCommandExecutor("zrank", execZRank, -3)
+	RegisterCommandExecutor("zpopmin", execPopMin, -2)
+	RegisterCommandExecutor("zpopmax", execPopMax, -2)
+	RegisterCommandExecutor("zcard", execZCard, 1)
+	RegisterCommandExecutor("zrange", execZRange, -3)
+	RegisterCommandExecutor("zrangebyscore", execZRangeByScore, -3)
 }
 
 func execZAdd(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) < 3 || (len(args)-1)%2 != 0 {
+	if !ValidateArgCount(command.Name(), len(args)) || (len(args)-1)%2 != 0 {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("ZADD"))
 	}
 	count := len(args) - 1
@@ -61,7 +61,7 @@ func execZAdd(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func execZScore(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) != 2 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("ZSCORE"))
 	}
 	zs, err := getSortedSet(db, string(args[0]))
@@ -79,7 +79,7 @@ func execZScore(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func execZRem(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) < 2 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("ZREM"))
 	}
 	zs, err := getSortedSet(db, string(args[0]))
@@ -99,7 +99,7 @@ func execZRem(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func execZRank(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) < 2 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("ZRANK"))
 	}
 	zs, err := getSortedSet(db, string(args[0]))
@@ -116,7 +116,7 @@ func execZRank(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func execPopMax(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) < 1 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("ZPOPMAX"))
 	}
 	count := 1
@@ -152,7 +152,7 @@ func execPopMax(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func execPopMin(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) < 1 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("ZPOPMIN"))
 	}
 	count := 1
@@ -188,7 +188,7 @@ func execPopMin(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func execZCard(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) != 1 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("ZCARD"))
 	}
 	sortedSet, err := getSortedSet(db, string(args[0]))
@@ -203,7 +203,7 @@ func execZCard(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func execZRange(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) < 3 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("ZRANGE"))
 	}
 	// parse start and end values
@@ -248,7 +248,7 @@ func execZRange(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func execZRangeByScore(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) < 3 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("ZRANGEBYSCORE"))
 	}
 	// parse interval, get min,max value and open options

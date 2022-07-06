@@ -9,23 +9,23 @@ import (
 )
 
 func init() {
-	RegisterCommandExecutor("hset", execHSet)
-	RegisterCommandExecutor("hget", execHGet)
-	RegisterCommandExecutor("hdel", execHDel)
-	RegisterCommandExecutor("hexists", execHExists)
-	RegisterCommandExecutor("hgetall", execHGetAll)
-	RegisterCommandExecutor("hkeys", execHKeys)
-	RegisterCommandExecutor("hlen", execHLen)
-	RegisterCommandExecutor("hmget", execHMGet)
-	RegisterCommandExecutor("hsetnx", execHSetNX)
-	RegisterCommandExecutor("hincrby", execHIncrBy)
-	RegisterCommandExecutor("hstrlen", execHStrLen)
-	RegisterCommandExecutor("hvals", execHVals)
+	RegisterCommandExecutor("hset", execHSet, -3)
+	RegisterCommandExecutor("hget", execHGet, 2)
+	RegisterCommandExecutor("hdel", execHDel, 2)
+	RegisterCommandExecutor("hexists", execHExists, 2)
+	RegisterCommandExecutor("hgetall", execHGetAll, 1)
+	RegisterCommandExecutor("hkeys", execHKeys, 1)
+	RegisterCommandExecutor("hlen", execHLen, 1)
+	RegisterCommandExecutor("hmget", execHMGet, -2)
+	RegisterCommandExecutor("hsetnx", execHSetNX, 3)
+	RegisterCommandExecutor("hincrby", execHIncrBy, 2)
+	RegisterCommandExecutor("hstrlen", execHStrLen, 2)
+	RegisterCommandExecutor("hvals", execHVals, 1)
 }
 
 func execHSet(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) < 3 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("HSET"))
 	}
 	hash, err := getOrInitHash(db, string(args[0]))
@@ -51,7 +51,7 @@ func execHSet(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func execHGet(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) != 2 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("HGET"))
 	}
 	hash, exists, err := getHash(db, string(args[0]))
@@ -70,7 +70,7 @@ func execHGet(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func execHDel(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) < 2 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("HDEL"))
 	}
 	hash, exists, err := getHash(db, string(args[0]))
@@ -91,7 +91,7 @@ func execHDel(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func execHExists(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) != 2 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("HEXISTS"))
 	}
 	hash, exists, err := getHash(db, string(args[0]))
@@ -108,7 +108,7 @@ func execHExists(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func execHGetAll(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) != 1 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("HGETALL"))
 	}
 	hash, exists, err := getHash(db, string(args[0]))
@@ -132,7 +132,7 @@ func execHGetAll(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func execHKeys(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) != 1 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("HKEYS"))
 	}
 	hash, exists, err := getHash(db, string(args[0]))
@@ -148,7 +148,7 @@ func execHKeys(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func execHLen(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) != 1 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("HKEYS"))
 	}
 	hash, exists, err := getHash(db, string(args[0]))
@@ -163,7 +163,7 @@ func execHLen(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func execHMGet(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) < 2 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("HKEYS"))
 	}
 	hash, exists, err := getHash(db, string(args[0]))
@@ -188,7 +188,7 @@ func execHMGet(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func execHSetNX(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) != 3 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("HSETNX"))
 	}
 	hash, err := getOrInitHash(db, string(args[0]))
@@ -204,7 +204,7 @@ func execHSetNX(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func execHIncrBy(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) != 3 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("HINCRBY"))
 	}
 	// parse delta value
@@ -237,7 +237,7 @@ func execHIncrBy(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func execHStrLen(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) != 2 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("HSTRLEN"))
 	}
 	hash, exists, err := getHash(db, string(args[0]))
@@ -255,7 +255,7 @@ func execHStrLen(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func execHVals(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) != 1 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("HVALS"))
 	}
 	hash, exists, err := getHash(db, string(args[0]))

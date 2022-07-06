@@ -11,12 +11,22 @@ type ExecFunc func(db *SingleDB, command redis.Command) *protocol.Reply
 
 type CommandExecutor struct {
 	execFunc ExecFunc
+	argCount int // nums of args needed, if argCount < 0: len(args) >= -argCount
 }
 
 var executors = make(map[string]*CommandExecutor)
 
-func RegisterCommandExecutor(cmdName string, exec ExecFunc) {
+func RegisterCommandExecutor(cmdName string, exec ExecFunc, argCount int) {
 	cmdName = strings.ToLower(cmdName)
-	executor := &CommandExecutor{execFunc: exec}
+	executor := &CommandExecutor{execFunc: exec, argCount: argCount}
 	executors[cmdName] = executor
+}
+
+func ValidateArgCount(name string, count int) bool {
+	executor := executors[name]
+	if executor.argCount < 0 {
+		return count >= -executor.argCount
+	} else {
+		return count == executor.argCount
+	}
 }

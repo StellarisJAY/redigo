@@ -14,19 +14,19 @@ import (
 )
 
 func init() {
-	RegisterCommandExecutor("ttl", execTTL)
-	RegisterCommandExecutor("pttl", execPTTL)
-	RegisterCommandExecutor("del", execDel)
-	RegisterCommandExecutor("exists", execExists)
-	RegisterCommandExecutor("persist", execPersist)
-	RegisterCommandExecutor("expire", execExpire)
-	RegisterCommandExecutor("type", execType)
-	RegisterCommandExecutor("pexpireat", execPExpireAt)
+	RegisterCommandExecutor("ttl", execTTL, 1)
+	RegisterCommandExecutor("pttl", execPTTL, 1)
+	RegisterCommandExecutor("del", execDel, -1)
+	RegisterCommandExecutor("exists", execExists, -1)
+	RegisterCommandExecutor("persist", execPersist, 1)
+	RegisterCommandExecutor("expire", execExpire, 2)
+	RegisterCommandExecutor("type", execType, 1)
+	RegisterCommandExecutor("pexpireat", execPExpireAt, 2)
 }
 
 func execKeys(db *SingleDB, command redis.Command, keys []string) *protocol.Reply {
 	args := command.Args()
-	if len(args) != 1 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("KEYS"))
 	}
 	if string(args[0]) == "*" {
@@ -45,7 +45,7 @@ func execKeys(db *SingleDB, command redis.Command, keys []string) *protocol.Repl
 
 func execTTL(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) != 1 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("ttl"))
 	}
 	key := string(args[0])
@@ -62,7 +62,7 @@ func execTTL(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func execPTTL(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) != 1 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("ttl"))
 	}
 	key := string(args[0])
@@ -79,7 +79,7 @@ func execPTTL(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func execDel(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) < 1 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("del"))
 	}
 	result := 0
@@ -97,7 +97,7 @@ func execDel(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func execExists(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) < 1 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("exists"))
 	}
 	existCount := 0
@@ -113,7 +113,7 @@ func execExists(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func execPersist(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) != 1 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("persist"))
 	}
 	key := string(args[0])
@@ -130,7 +130,7 @@ func execPersist(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func execExpire(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) != 2 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("persist"))
 	}
 	key := string(args[0])
@@ -157,7 +157,7 @@ func execExpire(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func execType(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) != 1 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("TYPE"))
 	}
 	entry, exists := db.getEntry(string(args[0]))
@@ -172,7 +172,7 @@ func execType(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func execPExpireAt(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) != 3 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("PEXPIREAT"))
 	}
 	expireAt, err := strconv.ParseInt(string(args[2]), 0, 64)

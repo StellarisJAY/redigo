@@ -11,23 +11,23 @@ import (
 )
 
 func init() {
-	RegisterCommandExecutor("sadd", execSAdd)
-	RegisterCommandExecutor("sismember", execSIsMember)
-	RegisterCommandExecutor("smembers", execSMembers)
-	RegisterCommandExecutor("srandmember", execSRandomMember)
-	RegisterCommandExecutor("srem", execSRem)
-	RegisterCommandExecutor("spop", execSPop)
-	RegisterCommandExecutor("sdiff", execSDiff)
-	RegisterCommandExecutor("sinter", execSInter)
-	RegisterCommandExecutor("scard", execSCard)
-	RegisterCommandExecutor("sdiffstore", execSDiffStore)
-	RegisterCommandExecutor("sinterstore", execSInterStore)
-	RegisterCommandExecutor("sunion", execSUnion)
+	RegisterCommandExecutor("sadd", execSAdd, -3)
+	RegisterCommandExecutor("sismember", execSIsMember, 1)
+	RegisterCommandExecutor("smembers", execSMembers, 1)
+	RegisterCommandExecutor("srandmember", execSRandomMember, 2)
+	RegisterCommandExecutor("srem", execSRem, 2)
+	RegisterCommandExecutor("spop", execSPop, -3)
+	RegisterCommandExecutor("sdiff", execSDiff, 2)
+	RegisterCommandExecutor("sinter", execSInter, 2)
+	RegisterCommandExecutor("scard", execSCard, 1)
+	RegisterCommandExecutor("sdiffstore", execSDiffStore, 3)
+	RegisterCommandExecutor("sinterstore", execSInterStore, 3)
+	RegisterCommandExecutor("sunion", execSUnion, 2)
 }
 
 func execSAdd(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) < 2 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("SADD"))
 	}
 	s, err := getOrCreateSet(db, string(args[0]))
@@ -45,7 +45,7 @@ func execSAdd(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func execSIsMember(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) < 2 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("SISMEMBER"))
 	}
 	s, err := getSet(db, string(args[0]))
@@ -60,7 +60,7 @@ func execSIsMember(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func execSMembers(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) != 1 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("SMEMBERS"))
 	}
 	s, err := getSet(db, string(args[0]))
@@ -75,7 +75,7 @@ func execSMembers(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func execSRandomMember(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) != 2 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("SRANDMEMBER"))
 	}
 	// parse random member count
@@ -95,7 +95,7 @@ func execSRandomMember(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func execSRem(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) < 2 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("LREM"))
 	}
 	s, err := getSet(db, string(args[0]))
@@ -116,7 +116,7 @@ func execSRem(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func execSPop(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) != 2 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("SPOP"))
 	}
 	// parse pop count, check if is integer
@@ -150,7 +150,7 @@ func execSPop(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func execSDiff(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) != 2 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("SDIFF"))
 	}
 	s1, err := getSet(db, string(args[0]))
@@ -174,7 +174,7 @@ func execSDiff(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func execSDiffStore(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) != 3 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("SDIFF"))
 	}
 	s1, err := getSet(db, string(args[0]))
@@ -207,7 +207,7 @@ func execSDiffStore(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func execSInter(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) != 2 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("SINTER"))
 	}
 	s1, err := getSet(db, string(args[0]))
@@ -228,7 +228,7 @@ func execSInter(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func execSInterStore(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) != 3 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("SINTERSTORE"))
 	}
 	s1, err := getSet(db, string(args[0]))
@@ -257,7 +257,7 @@ func execSInterStore(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func execSCard(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) != 1 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("SCARD"))
 	}
 	entry, exists := db.getEntry(string(args[0]))
@@ -270,7 +270,7 @@ func execSCard(db *SingleDB, command redis.Command) *protocol.Reply {
 
 func execSUnion(db *SingleDB, command redis.Command) *protocol.Reply {
 	args := command.Args()
-	if len(args) != 2 {
+	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("SINTER"))
 	}
 	s1, err := getSet(db, string(args[0]))
