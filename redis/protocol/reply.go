@@ -9,6 +9,7 @@ var (
 	OKReply        = &Reply{singleStr: "OK"}
 	NilReply       = &Reply{singleStr: "(nil)"}
 	EmptyListReply = &Reply{nilReply: false, bulkStringArray: [][]byte{}}
+	QueuedReply    = &Reply{singleStr: "QUEUED"}
 )
 
 type Reply struct {
