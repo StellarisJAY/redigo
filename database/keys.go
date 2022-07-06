@@ -26,7 +26,7 @@ func init() {
 
 func execKeys(db *SingleDB, command redis.Command, keys []string) *protocol.Reply {
 	args := command.Args()
-	if !ValidateArgCount(command.Name(), len(args)) {
+	if len(args) != 1 {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("KEYS"))
 	}
 	if string(args[0]) == "*" {
