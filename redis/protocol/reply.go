@@ -18,6 +18,7 @@ type Reply struct {
 	bulkStringArray [][]byte
 	singleStr       string
 	nilReply        bool
+	nested          bool
 }
 
 func NewNumberReply(number int) *Reply {
@@ -70,6 +71,17 @@ func NewArrayReply(arr [][]byte) *Reply {
 	}
 }
 
+func NewNestedArrayReply(arr [][]byte) *Reply {
+	return &Reply{
+		err:             nil,
+		number:          -1,
+		bulkStringArray: arr,
+		singleStr:       "",
+		nilReply:        false,
+		nested:          true,
+	}
+}
+
 func NewStringArrayReply(arr []string) *Reply {
 	bulkArr := make([][]byte, len(arr))
 	for i, str := range arr {
@@ -113,14 +125,18 @@ func (r *Reply) ToBytes() []byte {
 			// * length
 			builder.WriteString("*" + strconv.Itoa(len(r.bulkStringArray)) + CRLF)
 			for _, bulk := range r.bulkStringArray {
-				if bulk == nil {
-					builder.WriteString("$-1" + CRLF)
-					continue
+				if r.nested {
+					builder.Write(bulk)
+				} else {
+					if bulk == nil {
+						builder.WriteString("$-1" + CRLF)
+						continue
+					}
+					// Write $(len)\r\n{string}\r\n
+					builder.WriteString("$" + strconv.Itoa(len(bulk)) + CRLF)
+					builder.Write(bulk)
+					builder.WriteString(CRLF)
 				}
-				// Write $(len)\r\n{string}\r\n
-				builder.WriteString("$" + strconv.Itoa(len(bulk)) + CRLF)
-				builder.Write(bulk)
-				builder.WriteString(CRLF)
 			}
 			r.bulkStringArray = nil
 			return []byte(builder.String())
