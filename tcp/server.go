@@ -55,11 +55,6 @@ func (s *Server) Start() error {
 		// wait for close signal
 		<-s.closeChan
 		log.Println("Shutting down RediGO server...")
-		// close client connections
-		s.activeConns.Range(func(key, value interface{}) bool {
-			key.(*Connection).Close()
-			return true
-		})
 		// close database
 		s.db.Close()
 		_ = s.listener.Close()

@@ -1,12 +1,12 @@
 package pattern
 
 const (
-	normal         = 0
-	all            = 1 // *
-	any            = 2 // ?
-	symbolSet      = 3 // [...]
-	symbolRange    = 4 // [a-b]
-	symbolNegative = 5 // [^a]
+	normal         = iota
+	all            // *
+	any            // ?
+	symbolSet      // [...]
+	symbolRange    // [a-b]
+	symbolNegative // [^a]
 )
 
 type Pattern struct {
@@ -28,7 +28,7 @@ func (i *item) containsSymbol(symbol byte) bool {
 		// match symbol range
 		var max uint8 = 0
 		var min uint8 = 255
-		for s, _ := range i.set {
+		for s := range i.set {
 			if s > max {
 				max = s
 			}
@@ -98,10 +98,6 @@ func ParsePattern(p string) *Pattern {
 /*
 Matches function tells if a key is matched to the pattern
 
-h?llo
-h[...]llo
-
-hello
 */
 func (p *Pattern) Matches(key string) bool {
 	m := len(key)

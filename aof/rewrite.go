@@ -34,11 +34,13 @@ func (h *Handler) StartRewrite() error {
 		return protocol.AppendOnlyRewriteInProgressError
 	}
 	go func() {
+		start := time.Now()
 		err := h.rewrite()
 		if err != nil {
 			log.Println(err)
 		}
 		h.rewriteStarted.Store(false)
+		log.Println("Rewrite AOF finished, time used: ", time.Now().Sub(start).Milliseconds(), "ms")
 	}()
 	return nil
 }
