@@ -185,7 +185,7 @@ func (h *Handler) loadAof(maxBytes int64) error {
 
 		// bind the fake connection with command and execute command
 		cmd.BindConnection(&fakeConn)
-		h.db.Execute(*cmd)
+		h.db.Execute(cmd)
 	}
 	return nil
 }

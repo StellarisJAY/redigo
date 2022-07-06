@@ -4,7 +4,7 @@ import (
 	"log"
 	"redigo/datastruct/bitmap"
 	"redigo/interface/database"
-	"redigo/redis"
+	"redigo/interface/redis"
 	"redigo/redis/protocol"
 	"strconv"
 	"time"
@@ -79,7 +79,7 @@ func executeSet(db *SingleDB, command redis.Command) *protocol.Reply {
 		result = db.data.PutIfExists(key, entry)
 	}
 
-	db.addAof(command.Parts)
+	db.addAof(command.Parts())
 	// set ttl
 	if expireTime != infiniteExpireTime {
 		db.Expire(key, delay)
@@ -94,6 +94,7 @@ func executeSet(db *SingleDB, command redis.Command) *protocol.Reply {
 	if result == 0 {
 		return protocol.NilReply
 	} else {
+		db.addVersion(key)
 		return protocol.OKReply
 	}
 }
@@ -124,7 +125,7 @@ func executeSetNX(db *SingleDB, command redis.Command) *protocol.Reply {
 	exists := db.data.PutIfAbsent(key, entry)
 	if exists != 0 {
 		// add command to AOF
-		db.addAof(command.Parts)
+		db.addAof(command.Parts())
 		canceled := db.CancelTTL(key)
 		if canceled == 1 {
 			// add PERSIST command to aof
@@ -157,7 +158,7 @@ func executeAppend(db *SingleDB, command redis.Command) *protocol.Reply {
 		entry.Data = value
 		_ = db.data.Put(key, entry)
 		length = len(value)
-		db.addAof(command.Parts)
+		db.addAof(command.Parts())
 	} else {
 		// key doesn't exist.
 		entry := &database.Entry{Data: appendValue}

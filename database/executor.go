@@ -1,7 +1,7 @@
 package database
 
 import (
-	"redigo/redis"
+	"redigo/interface/redis"
 	"redigo/redis/protocol"
 	"strings"
 )
@@ -28,5 +28,12 @@ func ValidateArgCount(name string, count int) bool {
 		return count >= -executor.argCount
 	} else {
 		return count == executor.argCount
+	}
+}
+func (e *CommandExecutor) validateArgCount(count int) bool {
+	if e.argCount < 0 {
+		return count >= -e.argCount
+	} else {
+		return count == e.argCount
 	}
 }

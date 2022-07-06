@@ -7,7 +7,7 @@ import (
 	"redigo/datastruct/dict"
 	"redigo/datastruct/lock"
 	"redigo/interface/database"
-	"redigo/redis"
+	"redigo/interface/redis"
 	"redigo/redis/protocol"
 	"redigo/util/timewheel"
 	"time"

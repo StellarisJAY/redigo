@@ -1,7 +1,7 @@
 package database
 
 import (
-	"redigo/redis"
+	"redigo/interface/redis"
 	"redigo/redis/protocol"
 	"time"
 )

@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"redigo/interface/database"
+	"redigo/interface/redis"
 	"redigo/redis/parser"
 	"redigo/redis/protocol"
 )
@@ -17,6 +18,9 @@ type Connection struct {
 	ctx        context.Context
 	cancel     context.CancelFunc
 	selectedDB int
+	multi      bool
+	watching   map[string]int64
+	cmdQueue   []redis.Command
 }
 
 func NewConnection(conn net.Conn, db database.DB) *Connection {
@@ -28,6 +32,7 @@ func NewConnection(conn net.Conn, db database.DB) *Connection {
 		cancel:     cancel,
 		ctx:        ctx,
 		selectedDB: 0,
+		multi:      false,
 	}
 }
 
@@ -48,7 +53,7 @@ func (c *Connection) ReadLoop() error {
 			}
 		} else {
 			cmd.BindConnection(c)
-			c.db.SubmitCommand(*cmd)
+			c.db.SubmitCommand(cmd)
 		}
 	}
 }
@@ -90,4 +95,34 @@ func (c *Connection) SelectDB(index int) {
 
 func (c *Connection) DBIndex() int {
 	return c.selectedDB
+}
+
+func (c *Connection) SetMulti(multi bool) {
+	c.multi = multi
+}
+
+func (c *Connection) IsMulti() bool {
+	return c.multi
+}
+
+func (c *Connection) EnqueueCommand(command redis.Command) {
+	if c.cmdQueue == nil {
+		c.cmdQueue = make([]redis.Command, 0)
+	}
+	c.cmdQueue = append(c.cmdQueue, command)
+}
+
+func (c *Connection) GetQueuedCommands() []redis.Command {
+	return c.cmdQueue
+}
+
+func (c *Connection) AddWatching(key string, version int64) {
+	if c.watching == nil {
+		c.watching = make(map[string]int64)
+	}
+	c.watching[key] = version
+}
+
+func (c *Connection) GetWatching() map[string]int64 {
+	return c.watching
 }

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"io"
 	"log"
-	"redigo/redis"
+	"redigo/redis/cmd"
 	"strconv"
 )
 
@@ -18,7 +18,7 @@ func init() {
 	log.SetFlags(log.Ldate | log.Lshortfile)
 }
 
-func Parse(reader *bufio.Reader) (*redis.Command, error) {
+func Parse(reader *bufio.Reader) (*cmd.Command, error) {
 	msg, ioErr, err := readLine(reader)
 	if ioErr {
 		return nil, io.EOF
@@ -33,30 +33,25 @@ func Parse(reader *bufio.Reader) (*redis.Command, error) {
 		if err != nil {
 			return nil, err
 		}
-		cmd := redis.NewEmptyCommand()
+		command := cmd.NewEmptyCommand()
 		// parse RESP array
-		if err = readArray(reader, size, cmd); err != nil {
+		if err = readArray(reader, size, command); err != nil {
 			return nil, err
 		}
-		return cmd, nil
+		return command, nil
 
 	} else if msg[0] == '$' {
 		bulk, err := readBulkString(reader, msg)
 		if err != nil {
 			return nil, err
 		}
-		cmd := redis.NewBulkStringCommand(bulk)
-		return cmd, nil
+		return cmd.NewBulkStringCommand(bulk), nil
 	} else if msg[0] == '+' {
 		cmdName := msg[1 : len(msg)-2]
-		cmd := redis.NewEmptyCommand()
-		cmd.Parts = [][]byte{cmdName}
-		return cmd, nil
+		return cmd.NewCommand([][]byte{cmdName}), nil
 	} else {
 		if string(msg[:len(msg)-2]) == "PING" {
-			cmd := redis.NewEmptyCommand()
-			cmd.Parts = [][]byte{[]byte("PING")}
-			return cmd, nil
+			return cmd.NewCommand([][]byte{[]byte("PING")}), nil
 		}
 		return nil, nil
 	}
@@ -85,7 +80,7 @@ func readBulkString(reader io.Reader, lengthStr []byte) ([]byte, error) {
 	return buffer[0:length], nil
 }
 
-func readArray(reader *bufio.Reader, size int, cmd *redis.Command) error {
+func readArray(reader *bufio.Reader, size int, cmd *cmd.Command) error {
 	parts := make([][]byte, size)
 	for i := 0; i < size; i++ {
 		// read a line
@@ -106,7 +101,7 @@ func readArray(reader *bufio.Reader, size int, cmd *redis.Command) error {
 			// read RESP number
 		}
 	}
-	cmd.Parts = parts
+	cmd.SetParts(parts)
 	return nil
 }
 

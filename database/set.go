@@ -4,7 +4,7 @@ import (
 	"redigo/config"
 	"redigo/datastruct/set"
 	"redigo/interface/database"
-	"redigo/redis"
+	"redigo/interface/redis"
 	"redigo/redis/protocol"
 	"reflect"
 	"strconv"
@@ -39,7 +39,7 @@ func execSAdd(db *SingleDB, command redis.Command) *protocol.Reply {
 	for _, val := range vals {
 		count += s.Add(string(val))
 	}
-	db.addAof(command.Parts)
+	db.addAof(command.Parts())
 	return protocol.NewNumberReply(count)
 }
 
@@ -108,7 +108,7 @@ func execSRem(db *SingleDB, command redis.Command) *protocol.Reply {
 		for _, value := range values {
 			count += s.Remove(string(value))
 		}
-		db.addAof(command.Parts)
+		db.addAof(command.Parts())
 		return protocol.NewNumberReply(count)
 	}
 	return protocol.NewNumberReply(0)
@@ -201,7 +201,7 @@ func execSDiffStore(db *SingleDB, command redis.Command) *protocol.Reply {
 		dest.Add(value)
 	}
 	db.data.Put(string(args[0]), &database.Entry{Data: dest})
-	db.addAof(command.Parts)
+	db.addAof(command.Parts())
 	return protocol.NewStringArrayReply(diff)
 }
 
@@ -251,7 +251,7 @@ func execSInterStore(db *SingleDB, command redis.Command) *protocol.Reply {
 		dest.Add(value)
 	}
 	db.data.Put(string(args[0]), &database.Entry{Data: dest})
-	db.addAof(command.Parts)
+	db.addAof(command.Parts())
 	return protocol.NewStringArrayReply(inter)
 }
 

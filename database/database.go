@@ -4,7 +4,7 @@ import (
 	"redigo/aof"
 	"redigo/config"
 	"redigo/interface/database"
-	"redigo/redis"
+	"redigo/interface/redis"
 	"redigo/redis/protocol"
 	"strconv"
 	"time"
