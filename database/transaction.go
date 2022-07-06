@@ -59,7 +59,7 @@ func Exec(db *MultiDB, conn redis.Connection) *protocol.Reply {
 		reply := db.executeCommand(command)
 		replies[i] = reply.ToBytes()
 	}
-	return protocol.NewArrayReply(replies)
+	return protocol.NewNestedArrayReply(replies)
 }
 
 // check the version of the watched key. The string arg watch is dbIndex and key combined
