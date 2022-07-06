@@ -14,20 +14,22 @@ import (
 )
 
 type SingleDB struct {
-	data   dict.Dict
-	ttlMap dict.Dict
-	lock   *lock.Locker
-	idx    int
-	addAof func([][]byte)
+	data       dict.Dict
+	ttlMap     dict.Dict
+	lock       *lock.Locker
+	idx        int
+	addAof     func([][]byte)
+	versionMap dict.Dict
 }
 
 func NewSingleDB(idx int) *SingleDB {
 	return &SingleDB{
-		data:   dict.NewSimpleDict(),
-		ttlMap: dict.NewSimpleDict(),
-		lock:   lock.NewLock(1024),
-		idx:    idx,
-		addAof: func(i [][]byte) {},
+		data:       dict.NewSimpleDict(),
+		ttlMap:     dict.NewSimpleDict(),
+		lock:       lock.NewLock(1024),
+		idx:        idx,
+		versionMap: dict.NewSimpleDict(),
+		addAof:     func(i [][]byte) {},
 	}
 }
 
@@ -171,6 +173,23 @@ func (db *SingleDB) getEntry(key string) (entry *database.Entry, exists bool) {
 		return nil, false
 	}
 	return v.(*database.Entry), true
+}
+
+func (db *SingleDB) addVersion(key string) {
+	v, ok := db.versionMap.Get(key)
+	if ok {
+		db.versionMap.Put(key, v.(int64)+1)
+	} else {
+		db.versionMap.Put(key, int64(1))
+	}
+}
+
+func (db *SingleDB) getVersion(key string) int64 {
+	v, ok := db.versionMap.Get(key)
+	if !ok {
+		return -1
+	}
+	return v.(int64)
 }
 
 func (db *SingleDB) flushDB(async bool) {
