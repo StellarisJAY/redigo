@@ -152,7 +152,7 @@ func (db *SingleDB) expireIfNeeded(key string) bool {
 	if !ok {
 		return false
 	}
-	expireAt := v.(time.Time)
+	expireAt := v.(*time.Time)
 	if expireAt.Before(time.Now()) {
 		// remove key
 		db.data.Remove(key)
