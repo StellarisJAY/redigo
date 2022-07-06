@@ -72,6 +72,8 @@ func (m *MultiDB) initCommandExecutors() {
 	m.executors["bgrewriteaof"] = m.execBGRewriteAOF
 	m.executors["dbsize"] = m.execDBSize
 	m.executors["flushdb"] = m.execFlushDB
+	m.executors["multi"] = m.execMulti
+	m.executors["exec"] = m.execMultiExec
 }
 
 func (m *MultiDB) SubmitCommand(command redis.Command) {
@@ -105,6 +107,20 @@ func (m *MultiDB) Len(dbIdx int) int {
 }
 
 func (m *MultiDB) Execute(command redis.Command) *protocol.Reply {
+	conn := command.Connection()
+	name := command.Name()
+	if name == "multi" {
+		return m.execMulti(command)
+	} else if name == "exec" {
+		return m.execMultiExec(command)
+	} else if conn.IsMulti() {
+		return EnqueueCommand(conn, command)
+	} else {
+		return m.executeCommand(command)
+	}
+}
+
+func (m *MultiDB) executeCommand(command redis.Command) *protocol.Reply {
 	cmdName := command.Name()
 	if exec, ok := m.executors[cmdName]; ok {
 		return exec(command)
@@ -178,4 +194,25 @@ func (m *MultiDB) execFlushDB(command redis.Command) *protocol.Reply {
 	// use single database to write AOF
 	m.dbSet[index].(*SingleDB).addAof([][]byte{[]byte("FLUSHDB")})
 	return protocol.OKReply
+}
+
+func (m *MultiDB) execMulti(command redis.Command) *protocol.Reply {
+	conn := command.Connection()
+	return StartMulti(conn)
+}
+
+func (m *MultiDB) execMultiExec(command redis.Command) *protocol.Reply {
+	conn := command.Connection()
+	if !conn.IsMulti() {
+		return protocol.NewErrorReply(protocol.ExecWithoutMultiError)
+	}
+	return Exec(m, conn)
+}
+
+func (m *MultiDB) getVersion(dbIndex int, key string) int64 {
+	if dbIndex >= len(m.dbSet) {
+		return -2
+	}
+	db := m.dbSet[dbIndex]
+	return db.(*SingleDB).getVersion(key)
 }
