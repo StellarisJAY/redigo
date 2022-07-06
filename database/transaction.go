@@ -37,6 +37,10 @@ func EnqueueCommand(conn redis.Connection, command redis.Command) *protocol.Repl
 	if name == "multi" {
 		return protocol.NewErrorReply(protocol.NestedMultiCallError)
 	}
+	if name == "select" {
+		conn.EnqueueCommand(command)
+		return protocol.QueuedReply
+	}
 	if !ok {
 		return protocol.NewErrorReply(protocol.CreateUnknownCommandError(name))
 	}
