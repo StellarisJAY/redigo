@@ -19,4 +19,5 @@ type Connection interface {
 	GetQueuedCommands() []Command
 	AddWatching(key string, version int64)
 	GetWatching() map[string]int64
+	UnWatch()
 }

@@ -20,6 +20,7 @@ var (
 	NestedMultiCallError             = errors.New("ERR MULTI calls can not be nested")
 	CommandCannotUseInMultiError     = errors.New("ERR Command can't be used in MULTI")
 	ExecWithoutMultiError            = errors.New("ERR EXEC without MULTI")
+	DiscardWithoutMultiError         = errors.New("ERR DISCARD without MULTI")
 )
 
 func CreateWrongArgumentNumberError(command string) error {

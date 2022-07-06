@@ -98,6 +98,10 @@ func (c *Connection) DBIndex() int {
 }
 
 func (c *Connection) SetMulti(multi bool) {
+	if !multi {
+		c.watching = nil
+		c.cmdQueue = nil
+	}
 	c.multi = multi
 }
 
@@ -121,6 +125,12 @@ func (c *Connection) AddWatching(key string, version int64) {
 		c.watching = make(map[string]int64)
 	}
 	c.watching[key] = version
+}
+
+func (c *Connection) UnWatch() {
+	if c.watching != nil {
+		c.watching = nil
+	}
 }
 
 func (c *Connection) GetWatching() map[string]int64 {

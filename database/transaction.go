@@ -8,13 +8,18 @@ import (
 	"strings"
 )
 
-var forbiddenCmds = map[string]bool{"flushdb": true}
+var forbiddenCmds = map[string]bool{"flushdb": true, "watch": true, "unwatch": true}
 
 func Watch(db *SingleDB, conn redis.Connection, keys []string) *protocol.Reply {
 	for _, key := range keys {
 		version := db.getVersion(key)
 		conn.AddWatching(fmt.Sprintf("%d_%s", db.idx, key), version)
 	}
+	return protocol.OKReply
+}
+
+func UnWatch(conn redis.Connection) *protocol.Reply {
+	conn.UnWatch()
 	return protocol.OKReply
 }
 
@@ -46,6 +51,7 @@ func EnqueueCommand(conn redis.Connection, command redis.Command) *protocol.Repl
 }
 
 func Exec(db *MultiDB, conn redis.Connection) *protocol.Reply {
+	defer conn.SetMulti(false)
 	// check the watched keys' versions
 	watching := conn.GetWatching()
 	for watch, version := range watching {
@@ -60,6 +66,14 @@ func Exec(db *MultiDB, conn redis.Connection) *protocol.Reply {
 		replies[i] = reply.ToBytes()
 	}
 	return protocol.NewNestedArrayReply(replies)
+}
+
+func Discard(conn redis.Connection) *protocol.Reply {
+	if !conn.IsMulti() {
+		return protocol.NewErrorReply(protocol.DiscardWithoutMultiError)
+	}
+	conn.SetMulti(false)
+	return protocol.OKReply
 }
 
 // check the version of the watched key. The string arg watch is dbIndex and key combined

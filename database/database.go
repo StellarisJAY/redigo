@@ -74,6 +74,9 @@ func (m *MultiDB) initCommandExecutors() {
 	m.executors["flushdb"] = m.execFlushDB
 	m.executors["multi"] = m.execMulti
 	m.executors["exec"] = m.execMultiExec
+	m.executors["watch"] = m.execWatch
+	m.executors["unwatch"] = m.execUnWatch
+	m.executors["discard"] = m.execMultiDiscard
 }
 
 func (m *MultiDB) SubmitCommand(command redis.Command) {
@@ -207,6 +210,27 @@ func (m *MultiDB) execMultiExec(command redis.Command) *protocol.Reply {
 		return protocol.NewErrorReply(protocol.ExecWithoutMultiError)
 	}
 	return Exec(m, conn)
+}
+
+func (m *MultiDB) execMultiDiscard(command redis.Command) *protocol.Reply {
+	conn := command.Connection()
+	return Discard(conn)
+}
+
+func (m *MultiDB) execUnWatch(command redis.Command) *protocol.Reply {
+	return UnWatch(command.Connection())
+}
+
+func (m *MultiDB) execWatch(command redis.Command) *protocol.Reply {
+	if len(command.Args()) == 0 {
+		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("watch"))
+	}
+	conn := command.Connection()
+	keys := make([]string, len(command.Args()))
+	for i, arg := range command.Args() {
+		keys[i] = string(arg)
+	}
+	return Watch(m.dbSet[conn.DBIndex()].(*SingleDB), conn, keys)
 }
 
 func (m *MultiDB) getVersion(dbIndex int, key string) int64 {
