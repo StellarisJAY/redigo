@@ -1,6 +1,9 @@
 package lock
 
-import "sync"
+import (
+	"sort"
+	"sync"
+)
 
 var prime32 uint32 = 123456
 
@@ -57,18 +60,51 @@ func (l *Locker) RUnlock(key string) {
 	l.slots[idx].RUnlock()
 }
 
-func (l *Locker) RLockAll() {
+func (l *Locker) getLockSlots(keys ...string) []uint32 {
+	slotMap := make(map[uint32]bool)
+	for _, key := range keys {
+		index := l.indexFor(key)
+		slotMap[index] = true
+	}
+	slots := make([]uint32, 0, len(keys))
+	for slot, _ := range slotMap {
+		slots = append(slots, slot)
+	}
 
+	sort.Slice(slots, func(i, j int) bool {
+		return slots[i] > slots[j]
+	})
+	return slots
 }
 
-func (l *Locker) RUnlockAll() {
-
+func (l *Locker) RLockAll(keys ...string) {
+	slots := l.getLockSlots(keys...)
+	for _, slot := range slots {
+		mutex := l.slots[slot]
+		mutex.RLock()
+	}
 }
 
-func (l *Locker) LockAll() {
-
+func (l *Locker) RUnlockAll(keys ...string) {
+	slots := l.getLockSlots(keys...)
+	for _, slot := range slots {
+		mutex := l.slots[slot]
+		mutex.RUnlock()
+	}
 }
 
-func (l *Locker) UnlockAll() {
+func (l *Locker) LockAll(keys ...string) {
+	slots := l.getLockSlots(keys...)
+	for _, slot := range slots {
+		mutex := l.slots[slot]
+		mutex.Lock()
+	}
+}
 
+func (l *Locker) UnlockAll(keys ...string) {
+	slots := l.getLockSlots(keys...)
+	for _, slot := range slots {
+		mutex := l.slots[slot]
+		mutex.Unlock()
+	}
 }
