@@ -80,7 +80,7 @@ func parse(reader io.Reader) *ServerProperties {
 		case reflect.String:
 			fieldValue.SetString(value)
 		case reflect.Int:
-			num, err := strconv.ParseInt(value, 0, 64)
+			num, err := strconv.ParseInt(value, 10, 64)
 			if err == nil {
 				fieldValue.SetInt(num)
 			}

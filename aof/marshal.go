@@ -106,6 +106,6 @@ func makeExpireCommand(key string, expire *time.Time) *protocol.Reply {
 	command := make([][]byte, 3)
 	command[0] = pExpireAtCmd
 	command[1] = []byte(key)
-	command[2] = []byte(strconv.FormatInt(expire.UnixMilli(), 0))
+	command[2] = []byte(strconv.FormatInt(expire.UnixMilli(), 10))
 	return protocol.NewArrayReply(command)
 }
