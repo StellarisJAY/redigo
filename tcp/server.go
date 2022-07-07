@@ -105,6 +105,7 @@ func (s *Server) acceptLoop() error {
 			rErr := connect.ReadLoop()
 			if rErr != nil {
 				connect.Close()
+				s.db.OnConnectionClosed(connect)
 				//log.Println("Connection closed by remote client: ", connect.Conn.RemoteAddr().String())
 			}
 			s.activeConns.Delete(connect)
@@ -115,6 +116,7 @@ func (s *Server) acceptLoop() error {
 			wErr := connect.WriteLoop()
 			if wErr != nil {
 				connect.Close()
+				s.db.OnConnectionClosed(connect)
 				//log.Println("Connection closed by remote client: ", connect.Conn.RemoteAddr().String())
 			}
 			s.activeConns.Delete(connect)

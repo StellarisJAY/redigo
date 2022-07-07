@@ -84,6 +84,10 @@ func (db *SingleDB) Len(dbIdx int) int {
 	return db.data.Len()
 }
 
+func (db *SingleDB) OnConnectionClosed(conn redis.Connection) {
+
+}
+
 // Expire set a key's expire time
 func (db *SingleDB) Expire(key string, ttl time.Duration) {
 	expireTime := time.Now().Add(ttl)

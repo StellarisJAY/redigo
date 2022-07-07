@@ -129,6 +129,11 @@ func (m *MultiDB) Execute(command redis.Command) *protocol.Reply {
 	}
 }
 
+func (m *MultiDB) OnConnectionClosed(conn redis.Connection) {
+	// un-subscribe all channels of this connection
+	m.hub.UnSubscribeAll(conn)
+}
+
 func (m *MultiDB) executeCommand(command redis.Command) *protocol.Reply {
 	cmdName := command.Name()
 	if exec, ok := m.executors[cmdName]; ok {
