@@ -83,6 +83,7 @@ func executeSet(db *SingleDB, command redis.Command) *protocol.Reply {
 	// set ttl
 	if expireTime != infiniteExpireTime {
 		db.Expire(key, delay)
+		db.addAof([][]byte{[]byte("pexpireat"), args[0], []byte(strconv.FormatInt(time.Now().Add(delay).UnixMilli(), 10))})
 	} else {
 		// cancel old ttl
 		cancelled := db.CancelTTL(key)
@@ -247,8 +248,8 @@ func execSetBit(db *SingleDB, command redis.Command) *protocol.Reply {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("SETBIT"))
 	}
 	// parse offset and bit number
-	offset, err := strconv.ParseInt(string(args[1]), 0, 64)
-	bit, err := strconv.ParseInt(string(args[2]), 0, 8)
+	offset, err := strconv.ParseInt(string(args[1]), 10, 64)
+	bit, err := strconv.ParseInt(string(args[2]), 10, 8)
 	if err != nil {
 		return protocol.NewErrorReply(protocol.HashValueNotIntegerError)
 	}
@@ -273,7 +274,7 @@ func execGetBit(db *SingleDB, command redis.Command) *protocol.Reply {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("GETBIT"))
 	}
 	// check offset number
-	offset, err := strconv.ParseInt(string(args[1]), 0, 64)
+	offset, err := strconv.ParseInt(string(args[1]), 10, 64)
 	if err != nil {
 		return protocol.NewErrorReply(protocol.HashValueNotIntegerError)
 	}

@@ -98,6 +98,8 @@ func (db *SingleDB) Expire(key string, ttl time.Duration) {
 			}
 			db.ttlMap.Remove(key)
 			db.data.Remove(key)
+			// add delete key aof
+			db.addAof([][]byte{[]byte("del"), []byte(key)})
 			log.Println("Expired Key removed: ", key)
 		})
 	}
@@ -160,6 +162,8 @@ func (db *SingleDB) expireIfNeeded(key string) bool {
 		if config.Properties.UseScheduleExpire {
 			db.CancelTTL(key)
 		}
+		// add delete key to aof
+		db.addAof([][]byte{[]byte("del"), []byte(key)})
 		log.Println("Lazy expire key: ", key)
 		return true
 	}

@@ -145,11 +145,16 @@ func execExpire(db *SingleDB, command redis.Command) *protocol.Reply {
 		if num > 0 {
 			// cancel old ttl, set new expire time
 			db.CancelTTL(key)
+			delay := time.Duration(num)
 			db.Expire(key, time.Duration(num)*time.Second)
+			// add expireAt to aof
+			db.addAof([][]byte{[]byte("pexpireat"), args[0], []byte(strconv.FormatInt(time.Now().Add(delay).UnixMilli(), 10))})
 		} else {
 			// remove key and cancel ttl
 			db.data.Remove(key)
 			db.CancelTTL(key)
+			// key already expired, add del to aof
+			db.addAof([][]byte{[]byte("del"), args[0]})
 		}
 		return protocol.NewNumberReply(1)
 	}
@@ -175,14 +180,20 @@ func execPExpireAt(db *SingleDB, command redis.Command) *protocol.Reply {
 	if !ValidateArgCount(command.Name(), len(args)) {
 		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("PEXPIREAT"))
 	}
-	expireAt, err := strconv.ParseInt(string(args[2]), 0, 64)
+	expireAt, err := strconv.ParseInt(string(args[1]), 10, 64)
 	if err != nil {
 		return protocol.NewErrorReply(protocol.HashValueNotIntegerError)
 	}
 	_, exists := db.getEntry(string(args[0]))
 	if exists {
 		expireTime := time.UnixMilli(expireAt)
-		db.ExpireAt(string(args[0]), &expireTime)
+		if expireTime.Before(time.Now()) {
+			db.data.Remove(string(args[0]))
+			db.addAof([][]byte{[]byte("del"), args[0]})
+		} else {
+			db.ExpireAt(string(args[0]), &expireTime)
+			db.addAof(command.Parts())
+		}
 		return protocol.NewNumberReply(1)
 	} else {
 		return protocol.NewNumberReply(0)
