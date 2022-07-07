@@ -20,4 +20,6 @@ type Connection interface {
 	AddWatching(key string, version int64)
 	GetWatching() map[string]int64
 	UnWatch()
+
+	Active() bool
 }

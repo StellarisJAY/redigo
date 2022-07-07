@@ -9,6 +9,7 @@ import (
 	"redigo/interface/redis"
 	"redigo/redis/parser"
 	"redigo/redis/protocol"
+	"sync/atomic"
 )
 
 type Connection struct {
@@ -21,11 +22,12 @@ type Connection struct {
 	multi      bool
 	watching   map[string]int64
 	cmdQueue   []redis.Command
+	active     atomic.Value
 }
 
 func NewConnection(conn net.Conn, db database.DB) *Connection {
 	ctx, cancel := context.WithCancel(context.Background())
-	return &Connection{
+	connect := &Connection{
 		Conn:       conn,
 		ReplyChan:  make(chan *protocol.Reply, 1024),
 		db:         db,
@@ -33,7 +35,10 @@ func NewConnection(conn net.Conn, db database.DB) *Connection {
 		ctx:        ctx,
 		selectedDB: 0,
 		multi:      false,
+		active:     atomic.Value{},
 	}
+	connect.active.Store(true)
+	return connect
 }
 
 /*
@@ -80,6 +85,7 @@ func (c *Connection) WriteLoop() error {
 	close a connection
 */
 func (c *Connection) Close() {
+	c.active.Store(false)
 	_ = c.Conn.Close()
 	c.ReplyChan = nil
 	c.cancel()
@@ -135,4 +141,8 @@ func (c *Connection) UnWatch() {
 
 func (c *Connection) GetWatching() map[string]int64 {
 	return c.watching
+}
+
+func (c *Connection) Active() bool {
+	return c.active.Load().(bool)
 }
