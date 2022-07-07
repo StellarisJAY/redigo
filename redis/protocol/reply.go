@@ -138,7 +138,6 @@ func (r *Reply) ToBytes() []byte {
 					builder.WriteString(CRLF)
 				}
 			}
-			r.bulkStringArray = nil
 			return []byte(builder.String())
 		}
 	} else if r.err != nil {
