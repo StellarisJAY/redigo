@@ -5,6 +5,7 @@ import (
 	"redigo/config"
 	"redigo/interface/database"
 	"redigo/interface/redis"
+	"redigo/pubsub"
 	"redigo/redis/protocol"
 	"strconv"
 	"time"
@@ -15,6 +16,7 @@ type MultiDB struct {
 	cmdChan    chan redis.Command
 	executors  map[string]func(redis.Command) *protocol.Reply
 	aofHandler *aof.Handler
+	hub        *pubsub.Hub
 }
 
 func NewTempDB(dbSize int) *MultiDB {
@@ -36,6 +38,7 @@ func NewMultiDB(dbSize, cmdChanSize int) *MultiDB {
 		dbSet:     make([]database.DB, dbSize),
 		cmdChan:   make(chan redis.Command, cmdChanSize),
 		executors: make(map[string]func(redis.Command) *protocol.Reply),
+		hub:       pubsub.MakeHub(),
 	}
 	db.initCommandExecutors()
 	// initialize single databases in db set
@@ -77,6 +80,9 @@ func (m *MultiDB) initCommandExecutors() {
 	m.executors["watch"] = m.execWatch
 	m.executors["unwatch"] = m.execUnWatch
 	m.executors["discard"] = m.execMultiDiscard
+	m.executors["subscribe"] = m.execSubscribe
+	m.executors["publish"] = m.execPublish
+	m.executors["psubscribe"] = m.execPSubscribe
 }
 
 func (m *MultiDB) SubmitCommand(command redis.Command) {
@@ -231,6 +237,34 @@ func (m *MultiDB) execWatch(command redis.Command) *protocol.Reply {
 		keys[i] = string(arg)
 	}
 	return Watch(m.dbSet[conn.DBIndex()].(*SingleDB), conn, keys)
+}
+
+func (m *MultiDB) execSubscribe(command redis.Command) *protocol.Reply {
+	if len(command.Args()) == 0 {
+		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("subscribe"))
+	}
+	m.hub.Subscribe(command.Connection(), command.Args())
+	return nil
+}
+
+func (m *MultiDB) execPublish(command redis.Command) *protocol.Reply {
+	if len(command.Args()) != 2 {
+		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("publish"))
+	}
+	args := command.Args()
+	return protocol.NewNumberReply(m.hub.Publish(string(args[0]), args[1]))
+}
+
+func (m *MultiDB) execPSubscribe(command redis.Command) *protocol.Reply {
+	if len(command.Args()) == 0 {
+		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("psubscribe"))
+	}
+	patterns := make([]string, len(command.Args()))
+	for i, arg := range command.Args() {
+		patterns[i] = string(arg)
+	}
+	m.hub.PSubscribe(command.Connection(), patterns)
+	return nil
 }
 
 func (m *MultiDB) getVersion(dbIndex int, key string) int64 {
