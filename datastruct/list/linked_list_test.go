@@ -105,3 +105,45 @@ func TestLinkedList_LeftRange(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func BenchmarkLinkedList_AddLeft(b *testing.B) {
+	list := NewLinkedList()
+	values := make([][]byte, b.N)
+	for i := 0; i < b.N; i++ {
+		values[i] = []byte(strconv.Itoa(i))
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = list.AddLeft(values[i])
+	}
+}
+
+func BenchmarkLinkedList_Get(b *testing.B) {
+	list := NewLinkedList()
+	values := make([][]byte, b.N)
+	for i := 0; i < b.N; i++ {
+		values[i] = []byte(strconv.Itoa(i))
+	}
+	for i := 0; i < b.N; i++ {
+		_ = list.AddLeft(values[i])
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = list.Get(i)
+	}
+}
+
+func BenchmarkLinkedList_LeftRange(b *testing.B) {
+	list := NewLinkedList()
+	values := make([][]byte, 100000)
+	for i := 0; i < 100000; i++ {
+		values[i] = []byte(strconv.Itoa(i))
+	}
+	for i := 0; i < 100000; i++ {
+		_ = list.AddLeft(values[i])
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = list.LeftRange(10000, 50000)
+	}
+}

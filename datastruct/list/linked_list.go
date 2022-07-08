@@ -51,11 +51,19 @@ func (l *LinkedList) Get(index int) []byte {
 	if index >= l.size {
 		return nil
 	}
-	n := l.left
-	for i := 0; i < index && n != nil; i++ {
-		n = n.next
+	if index > l.size/2 {
+		n := l.right
+		for i := l.size - 1; i > index && n != nil; i-- {
+			n = n.prev
+		}
+		return n.value
+	} else {
+		n := l.left
+		for i := 0; i < index && n != nil; i++ {
+			n = n.next
+		}
+		return n.value
 	}
-	return n.value
 }
 
 func (l *LinkedList) Left() []byte {
