@@ -10,11 +10,13 @@ RediGO是用Go语言实现的Redis服务器。通过该项目学习Redis原理�
 - [x] Bitmap数据结构
 - [x] AOF持久化（fsync：暂不支持Always）
 - [x] AOF重写（BGRewriteAOF）
-- [x] multi事务功能
 - [ ] RDB持久化
+- [x] multi事务功能
+- [x] 发布订阅功能
 - [ ] LRU内存淘汰策略
 - [ ] Geo地理位置
-- [ ] 发布订阅功能
+- [ ] 主从、哨兵
+- [ ] 集群模式
 
 
 
@@ -29,6 +31,7 @@ RediGO是用Go语言实现的Redis服务器。通过该项目学习Redis原理�
 | zset     | ZADD, ZSCORE, ZREM, ZRANK, ZPOPMIN, ZPOPMAX, ZCARD, ZRANGE, ZRANGEBYSCORE |
 | key      | TTL, PTTL, EXPIRE, PERSIST, DEL, EXISTS, TYPE, KEYS          |
 | 事务     | MULTI, EXEC, DISCARD, WATCH, UNWATCH                         |
+| 发布订阅 | SUBSCRIBE, PUBLISH, PSUBSCRIBE                               |
 | 服务器   | PING                                                         |
 | 数据库   | SELECT, FLUSHDB, DBSIZE, BGREWRITEAOF                        |
 
