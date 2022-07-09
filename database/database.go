@@ -83,6 +83,7 @@ func (m *MultiDB) initCommandExecutors() {
 	m.executors["subscribe"] = m.execSubscribe
 	m.executors["publish"] = m.execPublish
 	m.executors["psubscribe"] = m.execPSubscribe
+	m.executors["move"] = m.execMove
 }
 
 func (m *MultiDB) SubmitCommand(command redis.Command) {
@@ -270,6 +271,38 @@ func (m *MultiDB) execPSubscribe(command redis.Command) *protocol.Reply {
 	}
 	m.hub.PSubscribe(command.Connection(), patterns)
 	return nil
+}
+
+func (m *MultiDB) execMove(command redis.Command) *protocol.Reply {
+	args := command.Args()
+	if len(args) != 2 {
+		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("move"))
+	}
+	key := string(args[0])
+	// parse database index, check if index in range
+	dbIndex, err := strconv.Atoi(string(args[1]))
+	if err != nil || dbIndex < 0 || dbIndex >= config.Properties.Databases {
+		return protocol.NewErrorReply(protocol.ValueNotIntegerOrOutOfRangeError)
+	}
+	currentIndex := command.Connection().DBIndex()
+	// target database is current database
+	if dbIndex == currentIndex {
+		return protocol.OKReply
+	}
+	currentDB := m.dbSet[currentIndex].(*SingleDB)
+	targetDB := m.dbSet[dbIndex].(*SingleDB)
+
+	// get key's value and target db's value
+	entry, exists := currentDB.getEntry(key)
+	_, duplicate := targetDB.getEntry(key)
+	// if key doesn't exist or target database already has key
+	if !exists || duplicate {
+		return protocol.NewNumberReply(0)
+	}
+	// remove key in current db, put key into target db
+	_ = currentDB.data.Remove(key)
+	_ = targetDB.data.Put(key, entry)
+	return protocol.NewNumberReply(1)
 }
 
 func (m *MultiDB) getVersion(dbIndex int, key string) int64 {
