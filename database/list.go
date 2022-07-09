@@ -10,9 +10,9 @@ import (
 )
 
 func init() {
-	RegisterCommandExecutor("lpush", execLPush, -3)
+	RegisterCommandExecutor("lpush", execLPush, -2)
 	RegisterCommandExecutor("lpop", execLPop, 1)
-	RegisterCommandExecutor("rpush", execRPush, -3)
+	RegisterCommandExecutor("rpush", execRPush, -2)
 	RegisterCommandExecutor("rpop", execRPop, 1)
 	RegisterCommandExecutor("lrange", execLRange, 3)
 	RegisterCommandExecutor("lindex", execLIndex, 2)
