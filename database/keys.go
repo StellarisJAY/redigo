@@ -22,6 +22,9 @@ func init() {
 	RegisterCommandExecutor("expire", execExpire, 2)
 	RegisterCommandExecutor("type", execType, 1)
 	RegisterCommandExecutor("pexpireat", execPExpireAt, 2)
+	RegisterCommandExecutor("rename", execRename, 2)
+	RegisterCommandExecutor("renamenx", execRenameNX, 2)
+	RegisterCommandExecutor("randomkey", execRandomKey, 0)
 }
 
 func execKeys(db *SingleDB, command redis.Command, keys []string) *protocol.Reply {
@@ -198,6 +201,47 @@ func execPExpireAt(db *SingleDB, command redis.Command) *protocol.Reply {
 	} else {
 		return protocol.NewNumberReply(0)
 	}
+}
+
+func execRename(db *SingleDB, command redis.Command) *protocol.Reply {
+	args := command.Args()
+	if !ValidateArgCount(command.Name(), len(args)) {
+		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("rename"))
+	}
+	oldKey := string(args[0])
+	newKey := string(args[1])
+	if oldKey == newKey {
+		return protocol.OKReply
+	}
+	if err := db.Rename(oldKey, newKey); err != nil {
+		return protocol.NewErrorReply(err)
+	}
+	return protocol.OKReply
+}
+
+func execRenameNX(db *SingleDB, command redis.Command) *protocol.Reply {
+	args := command.Args()
+	if !ValidateArgCount(command.Name(), len(args)) {
+		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("RENAMENX"))
+	}
+	oldKey := string(args[0])
+	newKey := string(args[1])
+	if newKey == oldKey {
+		return protocol.NewNumberReply(0)
+	}
+	if res, err := db.RenameNX(oldKey, newKey); err != nil {
+		return protocol.NewErrorReply(err)
+	} else {
+		return protocol.NewNumberReply(res)
+	}
+}
+
+func execRandomKey(db *SingleDB, command redis.Command) *protocol.Reply {
+	if db.Len(0) == 0 {
+		return protocol.NilReply
+	}
+	keys := db.randomKeys(1)
+	return protocol.NewBulkStringReply(keys[0])
 }
 
 func typeOf(entry database.Entry) string {

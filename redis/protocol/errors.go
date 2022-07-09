@@ -21,6 +21,7 @@ var (
 	CommandCannotUseInMultiError     = errors.New("ERR Command can't be used in MULTI")
 	ExecWithoutMultiError            = errors.New("ERR EXEC without MULTI")
 	DiscardWithoutMultiError         = errors.New("ERR DISCARD without MULTI")
+	NoSuchKeyError                   = errors.New("ERR no such key")
 )
 
 func CreateWrongArgumentNumberError(command string) error {

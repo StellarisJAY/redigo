@@ -213,7 +213,39 @@ func (db *SingleDB) flushDB(async bool) {
 	}
 }
 
+// Rename key, returns error if key doesn't exist
+func (db *SingleDB) Rename(old, key string) error {
+	entry, exists := db.getEntry(old)
+	if !exists {
+		return protocol.NoSuchKeyError
+	}
+	// remove old key, put new key
+	db.data.Remove(old)
+	db.data.Put(key, entry)
+	return nil
+}
+
+func (db *SingleDB) RenameNX(oldKey, newKey string) (int, error) {
+	entry, exists := db.getEntry(oldKey)
+	if !exists {
+		return 0, protocol.NoSuchKeyError
+	}
+	_, exists = db.getEntry(newKey)
+	if exists {
+		return 0, nil
+	}
+	// remove old key, put new key
+	db.data.Remove(oldKey)
+	db.data.Put(newKey, entry)
+	return 1, nil
+}
+
 func (db *SingleDB) Close() {
 	//TODO implement me
 	panic("implement me")
+}
+
+func (db *SingleDB) randomKeys(samples int) []string {
+	keys := db.data.RandomKeysDistinct(samples)
+	return keys
 }
