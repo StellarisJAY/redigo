@@ -6,17 +6,18 @@ import (
 )
 
 var (
-	OKReply        = &Reply{singleStr: "OK"}
-	NilReply       = &Reply{singleStr: "(nil)"}
+	OKReply        = &Reply{singleStr: []byte("OK")}
+	NilReply       = &Reply{singleStr: []byte("(nil)")}
 	EmptyListReply = &Reply{nilReply: false, bulkStringArray: [][]byte{}}
-	QueuedReply    = &Reply{singleStr: "QUEUED"}
+	QueuedReply    = &Reply{singleStr: []byte("QUEUED")}
 )
 
 type Reply struct {
 	err             error
 	number          int
 	bulkStringArray [][]byte
-	singleStr       string
+	singleStr       []byte
+	bulk            bool
 	nilReply        bool
 	nested          bool
 }
@@ -26,27 +27,21 @@ func NewNumberReply(number int) *Reply {
 }
 
 func NewBulkValueReply(value []byte) *Reply {
-	arr := make([][]byte, 0)
-	arr = append(arr, value)
 	return &Reply{
-		err:             nil,
-		number:          -1,
-		bulkStringArray: arr,
-		singleStr:       "",
-		nilReply:        false,
+		err:       nil,
+		number:    -1,
+		singleStr: value,
+		nilReply:  false,
+		bulk:      true,
 	}
 }
 
 // NewBulkStringReply returns a reply with multi-lined Bulk String
 func NewBulkStringReply(value string) *Reply {
-	arr := make([][]byte, 0)
-	arr = append(arr, []byte(value))
 	return &Reply{
-		err:             nil,
-		number:          -1,
-		bulkStringArray: arr,
-		singleStr:       "",
-		nilReply:        false,
+		err:       nil,
+		singleStr: []byte(value),
+		bulk:      true,
 	}
 }
 
@@ -56,7 +51,7 @@ func NewSingleStringReply(value string) *Reply {
 		err:             nil,
 		number:          -1,
 		bulkStringArray: nil,
-		singleStr:       value,
+		singleStr:       []byte(value),
 		nilReply:        false,
 	}
 }
@@ -66,7 +61,6 @@ func NewArrayReply(arr [][]byte) *Reply {
 		err:             nil,
 		number:          -1,
 		bulkStringArray: arr,
-		singleStr:       "",
 		nilReply:        false,
 	}
 }
@@ -76,7 +70,6 @@ func NewNestedArrayReply(arr [][]byte) *Reply {
 		err:             nil,
 		number:          -1,
 		bulkStringArray: arr,
-		singleStr:       "",
 		nilReply:        false,
 		nested:          true,
 	}
@@ -91,7 +84,6 @@ func NewStringArrayReply(arr []string) *Reply {
 		err:             nil,
 		number:          -1,
 		bulkStringArray: bulkArr,
-		singleStr:       "",
 		nilReply:        false,
 	}
 }
@@ -101,7 +93,6 @@ func NewErrorReply(err error) *Reply {
 		err:             err,
 		number:          -1,
 		bulkStringArray: nil,
-		singleStr:       "",
 		nilReply:        false,
 	}
 }
@@ -113,13 +104,15 @@ func (r *Reply) ToBytes() []byte {
 	if r.nilReply {
 		return []byte("$-1" + CRLF)
 	}
-	if r.singleStr != "" {
-		return []byte("+" + r.singleStr + CRLF)
+	if r.singleStr != nil {
+		if r.bulk {
+			return []byte("$" + strconv.Itoa(len(r.singleStr)) + CRLF + string(r.singleStr) + CRLF)
+		} else {
+			return []byte("+" + string(r.singleStr) + CRLF)
+		}
 	} else if r.bulkStringArray != nil {
 		if len(r.bulkStringArray) == 0 {
 			return []byte("*0" + CRLF)
-		} else if len(r.bulkStringArray) == 1 {
-			return []byte("+" + string(r.bulkStringArray[0]) + CRLF)
 		} else {
 			builder := strings.Builder{}
 			// * length
