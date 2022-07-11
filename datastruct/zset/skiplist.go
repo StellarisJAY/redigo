@@ -319,3 +319,13 @@ func (skl *skipList) PrintList() {
 		fmt.Println()
 	}
 }
+
+func (skl *skipList) forEach(fun func(score float64, member string) bool) {
+	n := skl.head.level[0].forward
+	for n != nil {
+		if !fun(n.Score, n.Member) {
+			break
+		}
+		n = n.level[0].forward
+	}
+}

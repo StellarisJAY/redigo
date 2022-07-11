@@ -101,9 +101,5 @@ func (zs *SortedSet) RangeByScore(min, max float64, offset, count int, lOpen, rO
 }
 
 func (zs *SortedSet) ForEach(fun func(score float64, value string) bool) {
-	for _, v := range zs.dict {
-		if !fun(v.Score, v.Member) {
-			break
-		}
-	}
+	zs.skl.forEach(fun)
 }
