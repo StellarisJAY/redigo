@@ -173,7 +173,7 @@ func (l *LinkedList) ForEach(fun func(idx int, value []byte) bool) {
 func NewLinkedList(vals ...[]byte) *LinkedList {
 	l := &LinkedList{}
 	for _, val := range vals {
-		l.AddLeft(val)
+		l.AddRight(val)
 	}
 	return l
 }
