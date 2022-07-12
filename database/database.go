@@ -1,11 +1,13 @@
 package database
 
 import (
+	"log"
 	"redigo/aof"
 	"redigo/config"
 	"redigo/interface/database"
 	"redigo/interface/redis"
 	"redigo/pubsub"
+	"redigo/rdb"
 	"redigo/redis/protocol"
 	"strconv"
 	"time"
@@ -91,6 +93,7 @@ func (m *MultiDB) initCommandExecutors() {
 	m.executors["publish"] = m.execPublish
 	m.executors["psubscribe"] = m.execPSubscribe
 	m.executors["move"] = m.execMove
+	m.executors["save"] = m.execSave
 }
 
 func (m *MultiDB) SubmitCommand(command redis.Command) {
