@@ -85,6 +85,10 @@ func readKeyValues(decoder *codec.Decoder, db *MultiDB, dbIndex int, size uint64
 				return fmt.Errorf("rdb read key expire time error: %v", err)
 			}
 			expireTime = ttl
+			b, err = decoder.ReadByte()
+			if err != nil {
+				return fmt.Errorf("rdb read key value type error: %v", err)
+			}
 		}
 		var key string
 		var entry *database.Entry
