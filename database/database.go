@@ -94,6 +94,7 @@ func (m *MultiDB) initCommandExecutors() {
 	m.executors["psubscribe"] = m.execPSubscribe
 	m.executors["move"] = m.execMove
 	m.executors["save"] = m.execSave
+	m.executors["bgsave"] = m.execBGSave
 }
 
 func (m *MultiDB) SubmitCommand(command redis.Command) {
@@ -324,11 +325,48 @@ func (m *MultiDB) getVersion(dbIndex int, key string) int64 {
 }
 
 func (m *MultiDB) execSave(command redis.Command) *protocol.Reply {
+	// prevent running BGSave and Save at the same time
+	if !m.aofHandler.RewriteStarted.CompareAndSwap(false, true) {
+		return protocol.NewErrorReply(protocol.AppendOnlyRewriteInProgressError)
+	}
+	defer m.aofHandler.RewriteStarted.Store(false)
 	startTime := time.Now()
 	err := rdb.Save(m)
 	if err != nil {
 		return protocol.NilReply
 	}
 	log.Println("RDB saved, time used: ", time.Now().Sub(startTime).Milliseconds(), "ms")
+	return protocol.OKReply
+}
+
+func (m *MultiDB) execBGSave(command redis.Command) *protocol.Reply {
+	if !m.aofHandler.RewriteStarted.CompareAndSwap(false, true) {
+		return protocol.NewErrorReply(protocol.AppendOnlyRewriteInProgressError)
+	}
+	startTime := time.Now()
+	// get the snapshot of current memory
+	snapshot := make([][]*rdb.DataEntry, config.Properties.Databases)
+	for i := 0; i < config.Properties.Databases; i++ {
+		size := m.dbSet[i].Len(i)
+		entries := make([]*rdb.DataEntry, size)
+		snapshot[i] = entries
+		j := 0
+		m.ForEach(i, func(key string, entry *database.Entry, expire *time.Time) bool {
+			entries[j] = &rdb.DataEntry{Key: key, Value: entry.Data, ExpireTime: expire}
+			j++
+			return true
+		})
+	}
+	// run save in background
+	go func(entries [][]*rdb.DataEntry, startTime time.Time) {
+		// release rewrite lock
+		defer m.aofHandler.RewriteStarted.Store(false)
+		err := rdb.BGSave(entries)
+		if err != nil {
+			log.Println("BGSave RDB error: ", err)
+		} else {
+			log.Println("BGSave RDB finished: ", time.Now().Sub(startTime).Milliseconds(), "ms")
+		}
+	}(snapshot, startTime)
 	return protocol.OKReply
 }

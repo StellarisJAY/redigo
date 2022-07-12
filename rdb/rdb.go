@@ -11,6 +11,12 @@ import (
 	"time"
 )
 
+type DataEntry struct {
+	Key        string
+	Value      interface{}
+	ExpireTime *time.Time
+}
+
 // Save generate a RDB file, write all data in memory to RDB
 func Save(db database.DB) error {
 	// open rdb file
@@ -56,6 +62,68 @@ func Save(db database.DB) error {
 			return true
 		})
 	}
+	err = encoder.Write([]byte{codec.EOF})
+	if err != nil {
+		return fmt.Errorf("rdb write EOF error: %v", err)
+	}
+	rdbFile.Close()
+	err = os.Rename(rdbFile.Name(), config.Properties.DBFileName)
+	if err != nil {
+		return fmt.Errorf("rename temp rdb file error: %v", err)
+	}
+	return nil
+}
+
+func BGSave(entries [][]*DataEntry) error {
+	// open rdb file
+	rdbFile, err := ioutil.TempFile("./", "dump-*.rdb")
+	if err != nil {
+		return err
+	}
+	defer rdbFile.Close()
+	encoder := codec.NewEncoder(rdbFile)
+	// write REDIS and VERSION
+	err = writeHeader(encoder)
+	if err != nil {
+		return fmt.Errorf("rdb write header error: %v", err)
+	}
+
+	for i, entrySet := range entries {
+		if entrySet != nil && len(entrySet) > 0 {
+			// select DB
+			err = encoder.WriteDBIndex(uint64(i))
+			if err != nil {
+				return fmt.Errorf("rdb write database index error: %v", err)
+			}
+			size := len(entrySet)
+			err = encoder.WriteDBSize(uint64(size), 0)
+			if err != nil {
+				return fmt.Errorf("rdb write database size error: %v", err)
+			}
+			// write key-value pairs
+			for _, entry := range entrySet {
+				if entry.ExpireTime != nil {
+					if entry.ExpireTime.Before(time.Now()) {
+						continue
+					} else {
+						// write expire time
+						err := encoder.WriteTTL(uint64(entry.ExpireTime.UnixMilli()))
+						if err != nil {
+							log.Println("rdb write expire time error: ", err)
+							break
+						}
+					}
+				}
+				// write entry's key value
+				err := encoder.WriteKeyValue(entry.Key, entry.Value)
+				if err != nil {
+					log.Println("rdb write key value error: ", err)
+					break
+				}
+			}
+		}
+	}
+
 	err = encoder.Write([]byte{codec.EOF})
 	if err != nil {
 		return fmt.Errorf("rdb write EOF error: %v", err)

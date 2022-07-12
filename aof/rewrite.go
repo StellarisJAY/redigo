@@ -30,7 +30,7 @@ func (h *Handler) makeRewriteHandler() *Handler {
 
 func (h *Handler) StartRewrite() error {
 	// CAS rewrite status
-	if !h.rewriteStarted.CompareAndSwap(false, true) {
+	if !h.RewriteStarted.CompareAndSwap(false, true) {
 		return protocol.AppendOnlyRewriteInProgressError
 	}
 	go func() {
@@ -39,7 +39,7 @@ func (h *Handler) StartRewrite() error {
 		if err != nil {
 			log.Println(err)
 		}
-		h.rewriteStarted.Store(false)
+		h.RewriteStarted.Store(false)
 		log.Println("Rewrite AOF finished, time used: ", time.Now().Sub(start).Milliseconds(), "ms")
 	}()
 	return nil

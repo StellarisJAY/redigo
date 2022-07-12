@@ -31,7 +31,7 @@ type Handler struct {
 	closeChan      chan struct{}
 	aofLock        sync.Mutex
 	dbMaker        func() database.DB
-	rewriteStarted atomic.Value
+	RewriteStarted atomic.Value
 }
 
 func NewAofHandler(db database.DB, dbMaker func() database.DB) (*Handler, error) {
@@ -39,8 +39,8 @@ func NewAofHandler(db database.DB, dbMaker func() database.DB) (*Handler, error)
 	handler.aofChan = make(chan Payload, 1<<16)
 	handler.closeChan = make(chan struct{})
 	handler.aofLock = sync.Mutex{}
-	handler.rewriteStarted = atomic.Value{}
-	handler.rewriteStarted.Store(false)
+	handler.RewriteStarted = atomic.Value{}
+	handler.RewriteStarted.Store(false)
 	handler.dbMaker = dbMaker
 	// create a ticker for EverySec AOF
 	if config.Properties.AppendFsync == config.FsyncEverySec {
