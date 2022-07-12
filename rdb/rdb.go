@@ -33,6 +33,10 @@ func Save(db database.DB) error {
 	}
 	// for each single database
 	for i := 0; i < config.Properties.Databases; i++ {
+		// skip empty database
+		if db.Len(i) == 0 {
+			continue
+		}
 		// select DB
 		err = encoder.WriteDBIndex(uint64(i))
 		if err != nil {

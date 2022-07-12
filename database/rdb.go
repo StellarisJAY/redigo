@@ -129,7 +129,7 @@ func readKeyValues(decoder *codec.Decoder, db *MultiDB, dbIndex int, size uint64
 			entry = &database.Entry{Data: zs}
 			key = k
 		default:
-			continue
+			break
 		}
 		singleDB.data.Put(key, entry)
 		// set key's expire time
