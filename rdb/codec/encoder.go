@@ -6,6 +6,10 @@ import (
 	"hash"
 	"hash/crc64"
 	"io"
+	"redigo/datastruct/dict"
+	"redigo/datastruct/list"
+	"redigo/datastruct/set"
+	"redigo/datastruct/zset"
 )
 
 type Encoder struct {
@@ -42,7 +46,7 @@ func (enc *Encoder) writeLength(length uint64) error {
 	} else if length <= maxUint14 {
 		buf = make([]byte, 2)
 		// 01 + uint14(length)
-		buf[0] = 0b01000000 | byte(length>>8)
+		buf[0] = 0x40 | byte(length>>8)
 		buf[1] = byte(length)
 	} else if length <= maxUint32 {
 		buf = make([]byte, 5)
@@ -54,4 +58,55 @@ func (enc *Encoder) writeLength(length uint64) error {
 		binary.BigEndian.PutUint64(buf[1:], length)
 	}
 	return enc.Write(buf)
+}
+
+func (enc *Encoder) WriteKeyValue(key string, value interface{}) error {
+	switch value.(type) {
+	case []byte:
+		return enc.WriteStringObject(key, value.([]byte))
+	case *list.LinkedList:
+		return enc.WriteListObject(key, value.(*list.LinkedList))
+	case dict.Dict:
+		return enc.WriteHashObject(key, value.(dict.Dict))
+	case *set.Set:
+		return enc.WriteSetObject(key, value.(*set.Set))
+	case *zset.SortedSet:
+		return enc.WriteZSetObject(key, value.(*zset.SortedSet))
+	}
+	return fmt.Errorf("unknown data structure error")
+}
+
+// WriteTTL write expire time
+func (enc *Encoder) WriteTTL(expireAt uint64) error {
+	buf := make([]byte, 9)
+	// prefix byte 0xfc
+	buf[0] = ExpireTimeMs
+	binary.BigEndian.PutUint64(buf[1:], expireAt)
+	return enc.Write(buf)
+}
+
+// WriteDBIndex select DB index
+func (enc *Encoder) WriteDBIndex(index uint64) error {
+	// prefix byte 0xfe
+	err := enc.Write([]byte{SelectDB})
+	if err != nil {
+		return err
+	}
+	return enc.writeLength(index)
+}
+
+// WriteDBSize write number of keys
+func (enc *Encoder) WriteDBSize(size, ttls uint64) error {
+	// prefix byte 0xfb
+	err := enc.Write([]byte{ReSizeDB})
+	if err != nil {
+		return err
+	}
+	// write db size
+	err = enc.writeLength(size)
+	if err != nil {
+		return err
+	}
+	// write ttl count
+	return enc.writeLength(ttls)
 }
