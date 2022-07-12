@@ -13,8 +13,9 @@ import (
 // load RDB file
 func loadRDB(db *MultiDB) error {
 	rdbFile, err := os.Open(config.Properties.DBFileName)
+	// no RDB file yet
 	if err != nil {
-		return fmt.Errorf("open RDB file error: %v", err)
+		return nil
 	}
 	defer rdbFile.Close()
 	// create a file decoder
