@@ -66,7 +66,7 @@ func (dec *Decoder) ReadZSetObject() (string, *zset.SortedSet, error) {
 			return key, nil, err
 		}
 		buf := make([]byte, 8)
-		_, err = dec.reader.Read(buf)
+		err = dec.Read(buf)
 		if err != nil {
 			return key, nil, err
 		}
