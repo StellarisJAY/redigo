@@ -17,6 +17,7 @@ var (
 	ValueNotFloatError               = errors.New("ERR value is not a valid float")
 	SyntaxError                      = errors.New("ERR syntax error")
 	AppendOnlyRewriteInProgressError = errors.New("ERR Background append only file rewriting already in progress")
+	BackgroundSaveInProgressError    = errors.New("ERR Background save already in progress")
 	NestedMultiCallError             = errors.New("ERR MULTI calls can not be nested")
 	CommandCannotUseInMultiError     = errors.New("ERR Command can't be used in MULTI")
 	ExecWithoutMultiError            = errors.New("ERR EXEC without MULTI")

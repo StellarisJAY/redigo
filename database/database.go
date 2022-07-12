@@ -329,7 +329,7 @@ func (m *MultiDB) getVersion(dbIndex int, key string) int64 {
 func (m *MultiDB) execSave(command redis.Command) *protocol.Reply {
 	// prevent running BGSave and Save at the same time
 	if !m.aofHandler.RewriteStarted.CompareAndSwap(false, true) {
-		return protocol.NewErrorReply(protocol.AppendOnlyRewriteInProgressError)
+		return protocol.NewErrorReply(protocol.BackgroundSaveInProgressError)
 	}
 	defer m.aofHandler.RewriteStarted.Store(false)
 	startTime := time.Now()
@@ -343,7 +343,7 @@ func (m *MultiDB) execSave(command redis.Command) *protocol.Reply {
 
 func (m *MultiDB) execBGSave(command redis.Command) *protocol.Reply {
 	if !m.aofHandler.RewriteStarted.CompareAndSwap(false, true) {
-		return protocol.NewErrorReply(protocol.AppendOnlyRewriteInProgressError)
+		return protocol.NewErrorReply(protocol.BackgroundSaveInProgressError)
 	}
 	startTime := time.Now()
 	// get the snapshot of current memory
@@ -370,5 +370,5 @@ func (m *MultiDB) execBGSave(command redis.Command) *protocol.Reply {
 			log.Println("BGSave RDB finished: ", time.Now().Sub(startTime).Milliseconds(), "ms")
 		}
 	}(snapshot, startTime)
-	return protocol.OKReply
+	return protocol.NewSingleStringReply("Background saving started")
 }
