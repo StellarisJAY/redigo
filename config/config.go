@@ -44,7 +44,7 @@ func init() {
 }
 
 func parse(reader io.Reader) *ServerProperties {
-	configs := &ServerProperties{}
+	configs := Properties
 	cfgMap := make(map[string]string)
 	scanner := bufio.NewScanner(reader)
 	// scan config file
