@@ -62,6 +62,13 @@ func NewMultiDB(dbSize, cmdChanSize int) *MultiDB {
 		}
 		db.aofHandler = aofHandler
 	}
+	rdbStart := time.Now()
+	err := loadRDB(db)
+	if err != nil {
+		log.Println("load rdb error: ", err)
+	} else {
+		log.Println("RDB Loaded time used: ", time.Now().Sub(rdbStart).Milliseconds(), "ms")
+	}
 	return db
 }
 
@@ -311,4 +318,14 @@ func (m *MultiDB) getVersion(dbIndex int, key string) int64 {
 	}
 	db := m.dbSet[dbIndex]
 	return db.(*SingleDB).getVersion(key)
+}
+
+func (m *MultiDB) execSave(command redis.Command) *protocol.Reply {
+	startTime := time.Now()
+	err := rdb.Save(m)
+	if err != nil {
+		return protocol.NilReply
+	}
+	log.Println("RDB saved, time used: ", time.Now().Sub(startTime).Milliseconds(), "ms")
+	return protocol.OKReply
 }
