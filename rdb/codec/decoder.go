@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 )
 
 const (
@@ -36,14 +37,14 @@ func NewDecoder(reader *bufio.Reader) *Decoder {
 }
 
 func (dec *Decoder) Read(buf []byte) error {
-	_, err := dec.reader.Read(buf)
+	_, err := io.ReadFull(dec.reader, buf)
 	return err
 }
 
 // read an int length value from reader
 func (dec *Decoder) readLength() (uint64, bool, error) {
 	// first byte is used to determine what kind of integer follows
-	firstByte, err := dec.reader.ReadByte()
+	firstByte, err := dec.ReadByte()
 	if err != nil {
 		return 0, false, fmt.Errorf("rdb read length error %v", err)
 	}
@@ -56,7 +57,7 @@ func (dec *Decoder) readLength() (uint64, bool, error) {
 		length = uint64(firstByte)
 	case 1:
 		// 01 + uint14
-		secByte, err := dec.reader.ReadByte()
+		secByte, err := dec.ReadByte()
 		if err != nil {
 			return 0, false, fmt.Errorf("rdb read uint14 error %v", err)
 		}
@@ -65,7 +66,7 @@ func (dec *Decoder) readLength() (uint64, bool, error) {
 	case 2:
 		// 10 + uint32
 		buf := make([]byte, 4)
-		_, err := dec.reader.Read(buf)
+		err := dec.Read(buf)
 		if err != nil {
 			return 0, false, fmt.Errorf("rdb read uint32 error %v", err)
 		}

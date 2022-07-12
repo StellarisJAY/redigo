@@ -52,7 +52,7 @@ func (dec *Decoder) readString() ([]byte, error) {
 		switch length {
 		case 0xc1:
 			// read uint8
-			readBytes, err := dec.reader.ReadByte()
+			readBytes, err := dec.ReadByte()
 			if err != nil {
 				return nil, err
 			}
@@ -60,7 +60,7 @@ func (dec *Decoder) readString() ([]byte, error) {
 		case 0xc2:
 			// read uint16
 			buf := make([]byte, 2)
-			_, err = dec.reader.Read(buf)
+			err = dec.Read(buf)
 			if err != nil {
 				return nil, err
 			}
@@ -68,7 +68,7 @@ func (dec *Decoder) readString() ([]byte, error) {
 		case 0xc3:
 			// read uint32
 			buf := make([]byte, 4)
-			_, err = dec.reader.Read(buf)
+			err = dec.Read(buf)
 			if err != nil {
 				return nil, err
 			}
@@ -79,7 +79,7 @@ func (dec *Decoder) readString() ([]byte, error) {
 	} else {
 		// read normal string
 		buf := make([]byte, length)
-		_, err = dec.reader.Read(buf)
+		err := dec.Read(buf)
 		if err != nil {
 			return nil, err
 		}
