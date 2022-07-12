@@ -34,6 +34,12 @@ type Handler struct {
 	RewriteStarted atomic.Value
 }
 
+func NewDummyAofHandler() *Handler {
+	handler := &Handler{RewriteStarted: atomic.Value{}}
+	handler.RewriteStarted.Store(false)
+	return handler
+}
+
 func NewAofHandler(db database.DB, dbMaker func() database.DB) (*Handler, error) {
 	handler := &Handler{db: db}
 	handler.aofChan = make(chan Payload, 1<<16)

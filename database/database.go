@@ -63,6 +63,8 @@ func NewMultiDB(dbSize, cmdChanSize int) *MultiDB {
 			}
 		}
 		db.aofHandler = aofHandler
+	} else {
+		db.aofHandler = aof.NewDummyAofHandler()
 	}
 	rdbStart := time.Now()
 	err := loadRDB(db)
