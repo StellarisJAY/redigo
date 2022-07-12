@@ -17,6 +17,9 @@ type ServerProperties struct {
 	UseScheduleExpire bool   `cfg:"useScheduleExpire"`
 	AppendFsync       string `cfg:"appendfsync"`
 	AofFileName       string `cfg:"appendfilename"`
+	MaxMemory         int64  `cfg:"maxmemory"`
+	MaxMemorySamples  int    `cfg:"maxmemory-samples"`
+	DBFileName        string `cfg:"dbfilename"`
 }
 
 var Properties *ServerProperties
@@ -34,6 +37,9 @@ func init() {
 		UseScheduleExpire: false,
 		AppendFsync:       FsyncNo,
 		AofFileName:       "appendonly.aof",
+		DBFileName:        "dump.rdb",
+		MaxMemorySamples:  5,
+		MaxMemory:         -1,
 	}
 }
 
