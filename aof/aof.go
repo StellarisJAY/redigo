@@ -197,5 +197,7 @@ func (h *Handler) loadAof(maxBytes int64) error {
 }
 
 func (h *Handler) Close() {
-	h.closeChan <- struct{}{}
+	if h.closeChan != nil {
+		h.closeChan <- struct{}{}
+	}
 }
