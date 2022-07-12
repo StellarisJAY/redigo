@@ -10,7 +10,7 @@ RediGO是用Go语言实现的Redis服务器。通过该项目学习Redis原理�
 - [x] Bitmap数据结构
 - [x] AOF持久化（fsync：暂不支持Always）
 - [x] AOF重写（BGRewriteAOF）
-- [ ] RDB持久化
+- [x] RDB持久化（SAVE和BGSAVE）
 - [x] multi事务功能
 - [x] 发布订阅功能
 - [ ] LRU内存淘汰策略
@@ -33,7 +33,7 @@ RediGO是用Go语言实现的Redis服务器。通过该项目学习Redis原理�
 | 事务     | MULTI, EXEC, DISCARD, WATCH, UNWATCH                         |
 | 发布订阅 | SUBSCRIBE, PUBLISH, PSUBSCRIBE                               |
 | 服务器   | PING                                                         |
-| 数据库   | SELECT, FLUSHDB, DBSIZE, BGREWRITEAOF                        |
+| 数据库   | SELECT, FLUSHDB, DBSIZE, BGREWRITEAOF, SAVE, BGSAVE          |
 
 
 
@@ -64,6 +64,9 @@ appendonly true
 appendfilename appendonly.aof
 # aof fsync策略（暂时不支持Always）
 appendfsync everysec
+
+# RDB持久化文件名
+dbfilename dump.rdb
 
 # 启用过期key定时删除（默认关闭，避免定时任务占用CPU）
 useScheduleExpire true
