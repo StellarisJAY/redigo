@@ -12,10 +12,7 @@ func New() *BitMap {
 
 // each slot contains 8 bits, this function tells the target offset's slot
 func getSlot(offset int64) int64 {
-	if offset%8 == 1 {
-		return offset / 8
-	}
-	return offset/8 + 1
+	return offset / 8
 }
 
 // if offset is greater than bitMap's slice size, expand slice
