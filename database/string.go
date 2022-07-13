@@ -30,6 +30,7 @@ func init() {
 	RegisterCommandExecutor("strlen", execStrLen, 1)
 	RegisterCommandExecutor("setbit", execSetBit, 3)
 	RegisterCommandExecutor("getbit", execGetBit, 2)
+	RegisterCommandExecutor("bitcount", execBitCount, 3)
 }
 
 func executeSet(db *SingleDB, command redis.Command) *protocol.Reply {
@@ -303,6 +304,26 @@ func execGetBit(db *SingleDB, command redis.Command) *protocol.Reply {
 		return protocol.NewNumberReply(int(bitMap.GetBit(offset)))
 	}
 	return protocol.NewNumberReply(0)
+}
+func execBitCount(db *SingleDB, command redis.Command) *protocol.Reply {
+	args := command.Args()
+	if !ValidateArgCount(command.Name(), len(args)) {
+		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("BITCOUNT"))
+	}
+
+	start, err := strconv.Atoi(string(args[1]))
+	end, err := strconv.Atoi(string(args[2]))
+	if err != nil {
+		return protocol.NewErrorReply(protocol.ValueNotIntegerOrOutOfRangeError)
+	}
+	bitMap, exists, err := getBitMap(db, string(args[0]))
+	if err != nil {
+		return protocol.NewErrorReply(err)
+	}
+	if !exists {
+		return protocol.NewNumberReply(0)
+	}
+	return protocol.NewNumberReply(int(bitMap.BitCount(int64(start), int64(end))))
 }
 
 // getString get the value of this key, if not string returns an error
