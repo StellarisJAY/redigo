@@ -27,6 +27,7 @@ func init() {
 	RegisterCommandExecutor("decr", executeDecr, 1)
 	RegisterCommandExecutor("incrby", executeIncrby, 2)
 	RegisterCommandExecutor("decrby", executeDecrby, 2)
+	RegisterCommandExecutor("strlen", execStrLen, 1)
 	RegisterCommandExecutor("setbit", execSetBit, 3)
 	RegisterCommandExecutor("getbit", execGetBit, 2)
 }
@@ -240,6 +241,21 @@ func add(db *SingleDB, key string, delta int) *protocol.Reply {
 		db.data.Put(key, entry)
 		return protocol.NewNumberReply(delta)
 	}
+}
+
+func execStrLen(db *SingleDB, command redis.Command) *protocol.Reply {
+	args := command.Args()
+	if !ValidateArgCount(command.Name(), len(args)) {
+		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("STRLEN"))
+	}
+	value, exists, err := getString(db, string(args[0]))
+	if err != nil {
+		return protocol.NewErrorReply(err)
+	}
+	if exists {
+		return protocol.NewNumberReply(len(value))
+	}
+	return protocol.NewNumberReply(0)
 }
 
 func execSetBit(db *SingleDB, command redis.Command) *protocol.Reply {
