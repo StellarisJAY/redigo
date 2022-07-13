@@ -333,10 +333,14 @@ func getString(db *SingleDB, key string) ([]byte, bool, error) {
 	if !exists {
 		return nil, false, nil
 	}
-	if !isString(*entry) {
-		return nil, true, protocol.WrongTypeOperationError
+	if isString(*entry) {
+		return entry.Data.([]byte), true, nil
 	}
-	return entry.Data.([]byte), true, nil
+	if isBitMap(*entry) {
+		var bitMap *bitmap.BitMap = entry.Data.(*bitmap.BitMap)
+		return *bitMap, true, nil
+	}
+	return nil, true, protocol.WrongTypeOperationError
 }
 
 func getBitMap(db *SingleDB, key string) (*bitmap.BitMap, bool, error) {
@@ -344,10 +348,15 @@ func getBitMap(db *SingleDB, key string) (*bitmap.BitMap, bool, error) {
 	if !exists {
 		return nil, false, nil
 	}
-	if !isBitMap(*entry) {
-		return nil, true, protocol.WrongTypeOperationError
+	if isString(*entry) {
+		var bitMap bitmap.BitMap = entry.Data.([]byte)
+		return &bitMap, true, nil
 	}
-	return entry.Data.(*bitmap.BitMap), true, nil
+	if isBitMap(*entry) {
+		return entry.Data.(*bitmap.BitMap), true, nil
+	}
+
+	return nil, true, protocol.WrongTypeOperationError
 }
 
 func isString(entry database.Entry) bool {
