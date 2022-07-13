@@ -6,6 +6,7 @@ import (
 	"hash"
 	"hash/crc64"
 	"io"
+	"redigo/datastruct/bitmap"
 	"redigo/datastruct/dict"
 	"redigo/datastruct/list"
 	"redigo/datastruct/set"
@@ -72,6 +73,10 @@ func (enc *Encoder) WriteKeyValue(key string, value interface{}) error {
 		return enc.WriteSetObject(key, value.(*set.Set))
 	case *zset.SortedSet:
 		return enc.WriteZSetObject(key, value.(*zset.SortedSet))
+	case *bitmap.BitMap:
+		// convert bitmap to []byte, and write RDB as string object
+		bm := value.(*bitmap.BitMap)
+		return enc.WriteStringObject(key, *bm)
 	}
 	return fmt.Errorf("unknown data structure error")
 }

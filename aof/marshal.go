@@ -1,6 +1,7 @@
 package aof
 
 import (
+	"redigo/datastruct/bitmap"
 	"redigo/datastruct/dict"
 	"redigo/datastruct/list"
 	"redigo/datastruct/set"
@@ -37,6 +38,10 @@ func EntryToCommand(key string, entry *database.Entry) *protocol.Reply {
 		command = setToCommand(key, entry.Data.(*set.Set))
 	case *zset.SortedSet:
 		command = zsetToCommand(key, entry.Data.(*zset.SortedSet))
+	case *bitmap.BitMap:
+		// convert bitmap to []byte to save AOF
+		bm := entry.Data.(*bitmap.BitMap)
+		command = stringToCommand(key, *bm)
 	}
 	return command
 }

@@ -282,6 +282,7 @@ func execSetBit(db *SingleDB, command redis.Command) *protocol.Reply {
 		db.data.Put(string(args[0]), entry)
 	}
 	original := bm.SetBit(offset, byte(bit))
+	db.addAof(command.Parts())
 	return protocol.NewNumberReply(int(original))
 }
 
