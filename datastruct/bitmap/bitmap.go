@@ -43,6 +43,47 @@ func (b *BitMap) GetBit(offset int64) byte {
 	return ((*b)[slot] >> offset0) & 0x01
 }
 
+func (b BitMap) BitCount(start, end int64) int64 {
+	length := int64(len(b) * 8)
+	if start < 0 {
+		start = length + start
+	}
+	if end < 0 {
+		end = length + end
+	}
+	if end >= length {
+		end = length - 1
+	}
+	if end < start {
+		return 0
+	}
+	startSlot := start / 8
+	startOff := int(start % 8)
+	endSlot := end / 8
+	endOff := int(end % 8)
+	var count int64 = 0
+	if startSlot == endSlot {
+		return int64(bitCount(b[startSlot], startOff, endOff))
+	}
+	count += int64(bitCount(b[startSlot], startOff, 7))
+	count += int64(bitCount(b[endSlot], 0, endOff))
+	for i := startSlot + 1; i < endSlot; i++ {
+		count += int64(bitCount(b[i], 0, 0))
+	}
+
+	return count
+}
+
+func bitCount(slot byte, offset0, offset1 int) int {
+	n := (slot >> offset0) & (1<<(offset1-offset0+1) - 1)
+	count := 0
+	for n > 0 {
+		n = n & (n - 1)
+		count++
+	}
+	return count
+}
+
 func (b *BitMap) printBits() {
 	for _, bit := range *b {
 		fmt.Println(bit)
