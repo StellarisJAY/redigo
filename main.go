@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
+	"redigo/cluster"
 	"redigo/config"
 	"redigo/database"
 	"redigo/tcp"
@@ -22,9 +24,14 @@ func init() {
 
 func main() {
 	fmt.Println(banner)
-	config.LoadConfigs("./redis.conf")
+	if len(os.Args) > 1 {
+		config.LoadConfigs(os.Args[1])
+	} else {
+		config.LoadConfigs("./redis.conf")
+	}
 	db := database.NewMultiDB(config.Properties.Databases, 1024)
-	server := tcp.NewServer(":"+config.Properties.Port, db)
+	peer := cluster.NewCluster(db, config.Properties.Address, config.Properties.Peers)
+	server := tcp.NewServer(":"+config.Properties.Port, peer)
 	err := server.Start()
 	if err != nil {
 		panic(err)
