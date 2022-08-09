@@ -70,15 +70,15 @@ func executeSet(db *SingleDB, command redis.Command) *protocol.Reply {
 		}
 	}
 
-	entry := &database.Entry{Data: value}
+	entry := &database.Entry{Key: key, Data: value, DataSize: int64(len(value))}
 	var result int
 	switch policy {
 	case defaultPolicy:
-		result = db.data.Put(key, entry)
+		result = db.putOrUpdateEntry(entry)
 	case insertPolicy:
-		result = db.data.PutIfAbsent(key, entry)
+		result = db.putIfAbsent(entry)
 	case updatePolicy:
-		result = db.data.PutIfExists(key, entry)
+		result = db.putIfExists(key, value)
 	}
 
 	db.addAof(command.Parts())
@@ -125,8 +125,8 @@ func executeSetNX(db *SingleDB, command redis.Command) *protocol.Reply {
 	key := string(args[0])
 	value := args[1]
 	entry := &database.Entry{Data: value}
-	exists := db.data.PutIfAbsent(key, entry)
-	if exists != 0 {
+	result := db.putIfAbsent(entry)
+	if result != 0 {
 		// add command to AOF
 		db.addAof(command.Parts())
 		canceled := db.CancelTTL(key)
@@ -135,7 +135,7 @@ func executeSetNX(db *SingleDB, command redis.Command) *protocol.Reply {
 			db.addAof([][]byte{[]byte("persist"), args[0]})
 		}
 	}
-	return protocol.NewNumberReply(exists)
+	return protocol.NewNumberReply(result)
 }
 
 func executeAppend(db *SingleDB, command redis.Command) *protocol.Reply {
@@ -158,14 +158,13 @@ func executeAppend(db *SingleDB, command redis.Command) *protocol.Reply {
 		value := make([]byte, len(originalValue)+len(appendValue))
 		copy(value[0:len(originalValue)], originalValue)
 		copy(value[len(originalValue):], appendValue)
-		entry.Data = value
-		_ = db.data.Put(key, entry)
+		db.updateEntry(entry, value)
 		length = len(value)
 		db.addAof(command.Parts())
 	} else {
 		// key doesn't exist.
 		entry := &database.Entry{Data: appendValue}
-		_ = db.data.Put(key, entry)
+		_ = db.putEntry(entry)
 		length = len(appendValue)
 		db.addAof([][]byte{[]byte("SET"), args[0], args[1]})
 	}
