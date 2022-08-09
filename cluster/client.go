@@ -65,29 +65,12 @@ func (c *PeerConn) sendCommand(ctx context.Context, command redis.Command) *prot
 	// 等待、读取、解析回复
 	reader := bufio.NewReader(c.Conn)
 	parsed, err := parser.Parse(reader)
-
 	// 网络接收超时或解析发生错误
 	if err != nil {
+		log.Println("parse peer reply error: ", err)
 		return protocol.NewErrorReply(protocol.ClusterPeerUnreachableError)
 	}
-	// 返回错误类型
-	if parsed.IsError() {
-		return protocol.NewErrorReply(errors.New(string(parsed.Parts()[0])))
-	} else if parsed.IsNumber() {
-		number, _ := strconv.Atoi(string(parsed.Parts()[0]))
-		return protocol.NewNumberReply(number)
-	}
-
-	// Nil 返回
-	if parsed.Parts() == nil {
-		return protocol.NilReply
-	}
-	if len(parsed.Parts()) == 1 {
-		return protocol.NewBulkValueReply(parsed.Parts()[0])
-	} else {
-		return protocol.NewArrayReply(parsed.Parts())
-	}
-
+	return commandToReply(parsed)
 }
 
 // RelayCommand 转发消息到目标peer，并等待结果
@@ -102,4 +85,21 @@ func (pc *PeerClient) RelayCommand(command redis.Command) *protocol.Reply {
 	}
 	defer pc.connPool.Put(c)
 	return conn.sendCommand(ctx, command)
+}
+
+func commandToReply(command redis.Command) *protocol.Reply {
+	switch command.Type() {
+	case redis.CommandTypeSingleLine:
+		return protocol.NewSingleStringReply(string(command.Parts()[0]))
+	case redis.CommandTypeBulk:
+		return protocol.NewBulkValueReply(command.Parts()[0])
+	case redis.CommandTypeArray:
+		return protocol.NewArrayReply(command.Parts())
+	case redis.CommandTypeNumber:
+		number, _ := strconv.Atoi(string(command.Parts()[0]))
+		return protocol.NewNumberReply(number)
+	case redis.CommandTypeError:
+		return protocol.NewErrorReply(errors.New(string(command.Parts()[0])))
+	}
+	return protocol.NilReply
 }
