@@ -1,6 +1,7 @@
 package bitmap
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -26,6 +27,30 @@ func TestBitMap_SetBit2(t *testing.T) {
 			t.Fail()
 		}
 	}
+}
+
+func TestBitMap_BitCount(t *testing.T) {
+	var b1 byte = 0x7f // 0111 1111
+
+	fmt.Println(bitCount(b1, 0, 1))
+	fmt.Println(bitCount(b1, 0, 2))
+	fmt.Println(bitCount(b1, 2, 4))
+	fmt.Println(bitCount(b1, 0, 7))
+	fmt.Println(bitCount(b1, 2, 7))
+	fmt.Println(bitCount(b1, 4, 7))
+}
+
+func TestBitMap_BitCount2(t *testing.T) {
+	bitMap1 := New()
+	var i int64
+	for i = 0; i < 16; i++ {
+		bitMap1.SetBit(i, 1)
+	}
+	fmt.Println(bitMap1.BitCount(0, 7))
+	fmt.Println(bitMap1.BitCount(0, -1))
+	fmt.Println(bitMap1.BitCount(1, -1))
+	fmt.Println(bitMap1.BitCount(2, -1))
+	fmt.Println(bitMap1.BitCount(3, -1))
 }
 
 func BenchmarkBitMap_GetBit(b *testing.B) {
