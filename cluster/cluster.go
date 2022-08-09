@@ -64,6 +64,5 @@ func (c *Cluster) Len(dbIdx int) int {
 }
 
 func (c *Cluster) OnConnectionClosed(conn redis.Connection) {
-	//TODO implement me
-	panic("implement me")
+	c.multiDB.OnConnectionClosed(conn)
 }
