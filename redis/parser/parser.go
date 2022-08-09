@@ -49,6 +49,10 @@ func Parse(reader *bufio.Reader) (*cmd.Command, error) {
 	} else if msg[0] == '+' {
 		cmdName := msg[1 : len(msg)-2]
 		return cmd.NewCommand([][]byte{cmdName}), nil
+	} else if msg[0] == '-' {
+		return cmd.NewErrorCommand(msg[1 : len(msg)-2]), nil
+	} else if msg[0] == ':' {
+		return cmd.NewNumberCommand(msg[1 : len(msg)-2]), nil
 	} else {
 		if string(msg[:len(msg)-2]) == "PING" {
 			return cmd.NewCommand([][]byte{[]byte("PING")}), nil

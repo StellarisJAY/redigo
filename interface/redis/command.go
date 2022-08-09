@@ -8,4 +8,8 @@ type Command interface {
 	Connection() Connection
 	Name() string
 	Parts() [][]byte
+
+	ToBytes() []byte
+	IsError() bool
+	IsNumber() bool
 }
