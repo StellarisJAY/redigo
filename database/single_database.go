@@ -8,6 +8,7 @@ import (
 	"redigo/datastruct/lock"
 	"redigo/interface/database"
 	"redigo/interface/redis"
+	"redigo/rdb"
 	"redigo/redis/protocol"
 	"redigo/util/timewheel"
 	"time"
@@ -20,17 +21,29 @@ type SingleDB struct {
 	idx        int
 	addAof     func([][]byte)
 	versionMap dict.Dict
+
+	lruHead *database.Entry
+	lruTail *database.Entry
+
+	maxMemory  int64
+	usedMemory int64
 }
 
 func NewSingleDB(idx int) *SingleDB {
-	return &SingleDB{
+	db := &SingleDB{
 		data:       dict.NewSimpleDict(),
 		ttlMap:     dict.NewSimpleDict(),
 		lock:       lock.NewLock(1024),
 		idx:        idx,
 		versionMap: dict.NewSimpleDict(),
 		addAof:     func(i [][]byte) {},
+		lruHead:    &database.Entry{},
+		lruTail:    &database.Entry{},
 	}
+	db.lruHead.NextLRUEntry = db.lruTail
+	db.lruTail.PrevLRUEntry = db.lruHead
+	db.maxMemory = config.Properties.MaxMemory
+	return db
 }
 
 func (db *SingleDB) ExecuteLoop() error {
@@ -175,12 +188,15 @@ func (db *SingleDB) expireIfNeeded(key string) bool {
 }
 
 // get the data entry holding the key's value. Checking key's existence and expire time
-func (db *SingleDB) getEntry(key string) (entry *database.Entry, exists bool) {
+func (db *SingleDB) getEntry(key string) (*database.Entry, bool) {
 	v, ok := db.data.Get(key)
 	if !ok || db.expireIfNeeded(key) {
 		return nil, false
 	}
-	return v.(*database.Entry), true
+	entry := v.(*database.Entry)
+	// get触发将数据移动到LRU队列尾部
+	db.lruMoveEntryToTail(entry)
+	return entry, true
 }
 
 func (db *SingleDB) addVersion(key string) {
@@ -248,4 +264,106 @@ func (db *SingleDB) Close() {
 func (db *SingleDB) randomKeys(samples int) []string {
 	keys := db.data.RandomKeysDistinct(samples)
 	return keys
+}
+
+func (db *SingleDB) Dump(key string) ([]byte, error) {
+	entry, exists := db.getEntry(key)
+	if !exists {
+		return nil, nil
+	}
+	return rdb.SerializeEntry(key, entry)
+}
+
+// lruMoveEntryToTail 将entry移动到LRU队列尾部
+func (db *SingleDB) lruMoveEntryToTail(entry *database.Entry) {
+	db.lruRemoveEntry(entry)
+	db.lruAddEntry(entry)
+}
+
+// lruRemoveEntry 从LRU队列删除某个entry
+func (db *SingleDB) lruRemoveEntry(entry *database.Entry) {
+	entry.NextLRUEntry.PrevLRUEntry = entry.PrevLRUEntry
+	entry.PrevLRUEntry.NextLRUEntry = entry.NextLRUEntry
+	entry.NextLRUEntry = nil
+	entry.PrevLRUEntry = nil
+}
+
+// lruAddEntry 在LRU队列尾部添加entry
+func (db *SingleDB) lruAddEntry(entry *database.Entry) {
+	entry.PrevLRUEntry = db.lruTail.PrevLRUEntry
+	entry.NextLRUEntry = db.lruTail
+	db.lruTail.PrevLRUEntry.NextLRUEntry = entry
+	db.lruTail.PrevLRUEntry = entry
+}
+
+// evict 内存淘汰，直到已占用内存达到小于等于目标值
+func (db *SingleDB) evict(targetMemory int64) {
+	for targetMemory < db.usedMemory {
+		// 如果lru队列已经没有entry了
+		if entry := db.lruHead.NextLRUEntry; entry == db.lruTail {
+			break
+		} else {
+			db.lruRemoveEntry(entry)
+			db.usedMemory -= entry.DataSize
+			db.data.Remove(entry.Key)
+			log.Println("evict entry, key: ", entry.Key, ", value size: ", entry.DataSize, "bytes")
+		}
+	}
+}
+
+func (db *SingleDB) putEntry(entry *database.Entry) int {
+	// 放入新的数据前，先进行内存淘汰
+	db.evict(db.maxMemory - entry.DataSize)
+	result := db.data.Put(entry.Key, entry)
+	if result != 0 {
+		db.lruAddEntry(entry)
+		db.usedMemory += entry.DataSize
+	}
+	return result
+}
+
+func (db *SingleDB) putOrUpdateEntry(entry *database.Entry) int {
+	if old, ok := db.data.Get(entry.Key); ok {
+		oldEntry := old.(*database.Entry)
+		db.updateEntry(oldEntry, entry.Data.([]byte))
+		return 1
+	} else {
+		return db.putEntry(entry)
+	}
+}
+
+func (db *SingleDB) putIfAbsent(entry *database.Entry) int {
+	if _, ok := db.data.Get(entry.Key); ok {
+		return 0
+	} else {
+		return db.putEntry(entry)
+	}
+}
+
+// putIfExists key存在的情况下更新value
+func (db *SingleDB) putIfExists(key string, value []byte) int {
+	if v, ok := db.data.Get(key); !ok {
+		return 0
+	} else if entry, ok := v.(*database.Entry); ok {
+		entry.Data = value
+		oldSize := entry.DataSize
+		entry.DataSize = int64(len(value))
+		db.lruMoveEntryToTail(entry)
+		db.evict(db.maxMemory - entry.DataSize)
+		db.usedMemory += entry.DataSize
+		db.usedMemory -= oldSize
+	}
+	return 0
+}
+
+// updateEntry 更新entry中的值，该方法只能由于字符串类型的value
+func (db *SingleDB) updateEntry(entry *database.Entry, value []byte) {
+	entry.Data = value
+	oldSize := entry.DataSize
+	entry.DataSize = int64(len(value))
+	// 先更新数据，然后再淘汰内存
+	db.lruMoveEntryToTail(entry)
+	db.evict(db.maxMemory - entry.DataSize + oldSize)
+	db.usedMemory += entry.DataSize
+	db.usedMemory -= oldSize
 }
