@@ -24,5 +24,10 @@ type DB interface {
 	Entry holds a data of a key
 */
 type Entry struct {
-	Data interface{}
+	Key          string
+	Data         interface{}
+	LRUTime      uint32 // LRU Idle time used in approx LRU eviction
+	NextLRUEntry *Entry
+	PrevLRUEntry *Entry
+	DataSize     int64
 }
