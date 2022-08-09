@@ -22,8 +22,9 @@ type ServerProperties struct {
 	MaxMemory         int64    `cfg:"maxmemory" yaml:"maxMemory"`
 	MaxMemorySamples  int      `cfg:"maxmemory-samples" yaml:"maxMemorySamples"`
 	DBFileName        string   `cfg:"dbfilename" yaml:"dbFileName"`
-	Peers             []string `yaml:"peers"`
 	Address           string   `yaml:"address"`
+	EnableClusterMode bool     `yaml:"enableClusterMode"`
+	Peers             []string `yaml:"peers"`
 }
 
 var Properties *ServerProperties
@@ -44,6 +45,7 @@ func init() {
 		DBFileName:        "dump.rdb",
 		MaxMemorySamples:  5,
 		MaxMemory:         -1,
+		EnableClusterMode: false,
 		Peers:             []string{},
 	}
 }
