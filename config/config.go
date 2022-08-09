@@ -2,7 +2,9 @@ package config
 
 import (
 	"bufio"
+	"github.com/ghodss/yaml"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"reflect"
@@ -11,15 +13,17 @@ import (
 )
 
 type ServerProperties struct {
-	Port              string `cfg:"port"`
-	Databases         int    `cfg:"databases"`
-	AppendOnly        bool   `cfg:"appendOnly"`
-	UseScheduleExpire bool   `cfg:"useScheduleExpire"`
-	AppendFsync       string `cfg:"appendfsync"`
-	AofFileName       string `cfg:"appendfilename"`
-	MaxMemory         int64  `cfg:"maxmemory"`
-	MaxMemorySamples  int    `cfg:"maxmemory-samples"`
-	DBFileName        string `cfg:"dbfilename"`
+	Port              string   `cfg:"port" yaml:"port"`
+	Databases         int      `cfg:"databases" yaml:"databases"`
+	AppendOnly        bool     `cfg:"appendOnly" yaml:"appendOnly"`
+	UseScheduleExpire bool     `cfg:"useScheduleExpire" yaml:"useScheduleExpire"`
+	AppendFsync       string   `cfg:"appendfsync" yaml:"appendFsync"`
+	AofFileName       string   `cfg:"appendfilename" yaml:"aofFileName"`
+	MaxMemory         int64    `cfg:"maxmemory" yaml:"maxMemory"`
+	MaxMemorySamples  int      `cfg:"maxmemory-samples" yaml:"maxMemorySamples"`
+	DBFileName        string   `cfg:"dbfilename" yaml:"dbFileName"`
+	Peers             []string `yaml:"peers"`
+	Address           string   `yaml:"address"`
 }
 
 var Properties *ServerProperties
@@ -40,6 +44,7 @@ func init() {
 		DBFileName:        "dump.rdb",
 		MaxMemorySamples:  5,
 		MaxMemory:         -1,
+		Peers:             []string{},
 	}
 }
 
@@ -100,11 +105,24 @@ func parse(reader io.Reader) *ServerProperties {
 	return configs
 }
 
+func parseYAML(file *os.File) *ServerProperties {
+	configs := Properties
+	bytes, err := ioutil.ReadAll(file)
+	if err != nil {
+		panic(err)
+	}
+	err = yaml.Unmarshal(bytes, configs)
+	if err != nil {
+		panic(err)
+	}
+	return configs
+}
+
 func LoadConfigs(configFilePath string) {
 	file, err := os.Open(configFilePath)
 	if err != nil {
 		panic(err)
 	}
 	defer file.Close()
-	Properties = parse(file)
+	Properties = parseYAML(file)
 }
