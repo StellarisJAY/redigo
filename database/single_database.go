@@ -311,9 +311,16 @@ func (db *SingleDB) evict(targetMemory int64) {
 	}
 }
 
+func (db *SingleDB) freeMemoryIfNeeded(targetMemory int64) {
+	if config.Properties.MaxMemory == -1 {
+		return
+	}
+	db.evict(targetMemory)
+}
+
 func (db *SingleDB) putEntry(entry *database.Entry) int {
 	// 放入新的数据前，先进行内存淘汰
-	db.evict(db.maxMemory - entry.DataSize)
+	db.freeMemoryIfNeeded(db.maxMemory - entry.DataSize)
 	result := db.data.Put(entry.Key, entry)
 	if result != 0 {
 		db.lruAddEntry(entry)
@@ -349,7 +356,7 @@ func (db *SingleDB) putIfExists(key string, value []byte) int {
 		oldSize := entry.DataSize
 		entry.DataSize = int64(len(value))
 		db.lruMoveEntryToTail(entry)
-		db.evict(db.maxMemory - entry.DataSize)
+		db.freeMemoryIfNeeded(db.maxMemory - entry.DataSize)
 		db.usedMemory += entry.DataSize
 		db.usedMemory -= oldSize
 	}
@@ -363,7 +370,7 @@ func (db *SingleDB) updateEntry(entry *database.Entry, value []byte) {
 	entry.DataSize = int64(len(value))
 	// 先更新数据，然后再淘汰内存
 	db.lruMoveEntryToTail(entry)
-	db.evict(db.maxMemory - entry.DataSize + oldSize)
+	db.freeMemoryIfNeeded(db.maxMemory - entry.DataSize + oldSize)
 	db.usedMemory += entry.DataSize
 	db.usedMemory -= oldSize
 }
