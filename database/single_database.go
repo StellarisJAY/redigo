@@ -276,8 +276,10 @@ func (db *SingleDB) Dump(key string) ([]byte, error) {
 
 // lruMoveEntryToTail 将entry移动到LRU队列尾部
 func (db *SingleDB) lruMoveEntryToTail(entry *database.Entry) {
-	db.lruRemoveEntry(entry)
-	db.lruAddEntry(entry)
+	if config.Properties.MaxMemory != -1 {
+		db.lruRemoveEntry(entry)
+		db.lruAddEntry(entry)
+	}
 }
 
 // lruRemoveEntry 从LRU队列删除某个entry
