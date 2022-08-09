@@ -1,5 +1,21 @@
 package redis
 
+const (
+	CommandTypeSingleLine byte = iota
+	CommandTypeBulk
+	CommandTypeArray
+	CommandTypeNumber
+	CommandTypeError
+)
+
+const (
+	SingleLinePrefix = '+'
+	BulkPrefix       = '$'
+	ArrayPrefix      = '*'
+	ErrorPrefix      = '-'
+	NumberPrefix     = ':'
+)
+
 type Command interface {
 	Append(part []byte)
 	Len() int
@@ -10,6 +26,5 @@ type Command interface {
 	Parts() [][]byte
 
 	ToBytes() []byte
-	IsError() bool
-	IsNumber() bool
+	Type() byte
 }

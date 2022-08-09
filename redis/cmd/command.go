@@ -9,10 +9,9 @@ import (
 const CRLF = "\r\n"
 
 type Command struct {
-	parts    [][]byte
-	conn     redis.Connection
-	isError  bool
-	isNumber bool
+	parts       [][]byte
+	conn        redis.Connection
+	commandType byte
 }
 
 func NewEmptyCommand() *Command {
@@ -20,25 +19,31 @@ func NewEmptyCommand() *Command {
 }
 
 func NewCommand(parts [][]byte) *Command {
-	return &Command{parts: parts}
+	return &Command{parts: parts, commandType: redis.CommandTypeArray}
 }
 
 func NewBulkStringCommand(bulk []byte) *Command {
-	return &Command{parts: [][]byte{bulk}}
+	return &Command{parts: [][]byte{bulk}, commandType: redis.CommandTypeBulk}
 }
 
 func NewErrorCommand(message []byte) *Command {
 	return &Command{
-		parts:   [][]byte{message},
-		isError: true,
+		parts:       [][]byte{message},
+		commandType: redis.CommandTypeError,
 	}
 }
 
 func NewNumberCommand(number []byte) *Command {
 	return &Command{
-		parts:    [][]byte{number},
-		isError:  false,
-		isNumber: true,
+		parts:       [][]byte{number},
+		commandType: redis.CommandTypeNumber,
+	}
+}
+
+func NewSingleLineCommand(message []byte) *Command {
+	return &Command{
+		parts:       [][]byte{message},
+		commandType: redis.CommandTypeSingleLine,
 	}
 }
 
@@ -87,12 +92,8 @@ func (c *Command) SetParts(parts [][]byte) {
 	c.parts = parts
 }
 
-func (c *Command) IsError() bool {
-	return c.isError
-}
-
-func (c *Command) IsNumber() bool {
-	return c.isNumber
+func (c *Command) Type() byte {
+	return c.commandType
 }
 
 func createSingleStringReply(value string) []byte {
