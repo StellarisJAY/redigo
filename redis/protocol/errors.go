@@ -23,6 +23,8 @@ var (
 	ExecWithoutMultiError            = errors.New("ERR EXEC without MULTI")
 	DiscardWithoutMultiError         = errors.New("ERR DISCARD without MULTI")
 	NoSuchKeyError                   = errors.New("ERR no such key")
+	ClusterPeerNotFoundError         = errors.New("ERR cluster peer not found")
+	ClusterPeerUnreachableError      = errors.New("ERR can't reach cluster peer")
 )
 
 func CreateWrongArgumentNumberError(command string) error {
