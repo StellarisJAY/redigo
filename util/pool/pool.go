@@ -1,6 +1,7 @@
 package pool
 
 import (
+	"context"
 	"fmt"
 	"sync"
 )
@@ -48,10 +49,26 @@ func (p *Pool) Get() interface{} {
 	if e := p.TryGet(); e != nil {
 		return e
 	}
-	if e := p.createNew(); e != nil {
+	if e, full := p.createNew(); !full {
 		return e
 	}
 	return <-p.cache
+}
+
+// Load a resource from Pool. Create a new resource. Wait available resource or context done
+func (p *Pool) Load(ctx context.Context) interface{} {
+	if e := p.TryGet(); e != nil {
+		return e
+	}
+	if e, full := p.createNew(); !full {
+		return e
+	}
+	select {
+	case obj := <-p.cache:
+		return obj
+	case <-ctx.Done():
+		return nil
+	}
 }
 
 // TryGet try pop one resource from pool channel. If channel is empty, function returns nil immediately
@@ -76,13 +93,13 @@ func (p *Pool) Size() int {
 	return p.size
 }
 
-func (p *Pool) createNew() interface{} {
+func (p *Pool) createNew() (interface{}, bool) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	if p.size < p.capacity {
 		p.size++
-		return p.newFunc()
+		return p.newFunc(), false
 	} else {
-		return nil
+		return nil, true
 	}
 }
