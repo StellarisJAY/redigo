@@ -100,6 +100,10 @@ func commandToReply(command redis.Command) *protocol.Reply {
 		return protocol.NewNumberReply(number)
 	case redis.CommandTypeError:
 		return protocol.NewErrorReply(errors.New(string(command.Parts()[0])))
+	case redis.ReplyTypeNil:
+		return protocol.NilReply
+	case redis.ReplyEmptyList:
+		return protocol.EmptyListReply
 	}
 	return protocol.NilReply
 }
