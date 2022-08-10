@@ -40,55 +40,29 @@ func Parse(reader *bufio.Reader) (*cmd.Command, error) {
 		if err != nil {
 			return nil, err
 		}
-		command = cmd.NewBulkStringCommand(bulk)
+		if bulk == nil {
+			command = cmd.NewNilCommand()
+		} else {
+			command = cmd.NewBulkStringCommand(bulk)
+		}
+		return command, nil
 	case redis.ArrayPrefix:
 		// get Array size
 		size, err := strconv.Atoi(string(msg[1 : len(msg)-2]))
 		if err != nil {
 			return nil, err
 		}
-		command = cmd.NewEmptyCommand()
+		if size == 0 {
+			return cmd.NewEmptyListCommand(), nil
+		}
 		// parse RESP array
-		if err = readArray(reader, size, command); err != nil {
+		if parts, err := readArray(reader, size); err != nil {
 			return nil, err
+		} else {
+			return cmd.NewCommand(parts), nil
 		}
 	}
-
 	return command, nil
-
-	//// RESP Array type
-	//if msg[0] == '*' {
-	//	// get Array size
-	//	size, err := strconv.Atoi(string(msg[1 : len(msg)-2]))
-	//	if err != nil {
-	//		return nil, err
-	//	}
-	//	command := cmd.NewEmptyCommand()
-	//	// parse RESP array
-	//	if err = readArray(reader, size, command); err != nil {
-	//		return nil, err
-	//	}
-	//	return command, nil
-	//
-	//} else if msg[0] == '$' {
-	//	bulk, err := readBulkString(reader, msg)
-	//	if err != nil {
-	//		return nil, err
-	//	}
-	//	return cmd.NewBulkStringCommand(bulk), nil
-	//} else if msg[0] == '+' {
-	//	cmdName := msg[1 : len(msg)-2]
-	//	return cmd.NewCommand([][]byte{cmdName}), nil
-	//} else if msg[0] == '-' {
-	//	return cmd.NewErrorCommand(msg[1 : len(msg)-2]), nil
-	//} else if msg[0] == ':' {
-	//	return cmd.NewNumberCommand(msg[1 : len(msg)-2]), nil
-	//} else {
-	//	if string(msg[:len(msg)-2]) == "PING" {
-	//		return cmd.NewCommand([][]byte{[]byte("PING")}), nil
-	//	}
-	//	return nil, nil
-	//}
 }
 
 /*
@@ -114,29 +88,26 @@ func readBulkString(reader io.Reader, lengthStr []byte) ([]byte, error) {
 	return buffer[0:length], nil
 }
 
-func readArray(reader *bufio.Reader, size int, cmd *cmd.Command) error {
+func readArray(reader *bufio.Reader, size int) ([][]byte, error) {
 	parts := make([][]byte, size)
 	for i := 0; i < size; i++ {
 		// read a line
 		msg, ioErr, err := readLine(reader)
 		if ioErr {
-			return io.EOF
+			return nil, io.EOF
 		} else if err != nil {
-			return err
+			return nil, err
 		}
 		// read RESP Array
-		if msg[0] == '$' {
+		if msg[0] == '$' || msg[0] == ':' {
 			bulk, err := readBulkString(reader, msg)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			parts[i] = bulk
-		} else if msg[0] == ':' {
-			// read RESP number
 		}
 	}
-	cmd.SetParts(parts)
-	return nil
+	return parts, nil
 }
 
 func readLine(reader *bufio.Reader) ([]byte, bool, error) {

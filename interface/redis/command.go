@@ -6,6 +6,8 @@ const (
 	CommandTypeArray
 	CommandTypeNumber
 	CommandTypeError
+	ReplyTypeNil
+	ReplyEmptyList
 )
 
 const (

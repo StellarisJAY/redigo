@@ -5,73 +5,70 @@ import (
 	"strings"
 )
 
+const (
+	CommandTypeSingleLine byte = iota
+	CommandTypeBulk
+	CommandTypeArray
+	CommandTypeNumber
+	CommandTypeError
+	ReplyTypeNil
+	ReplyEmptyList
+)
+
 var (
-	OKReply        = &Reply{singleStr: []byte("OK")}
-	NilReply       = &Reply{singleStr: []byte("(nil)")}
-	EmptyListReply = &Reply{nilReply: false, bulkStringArray: [][]byte{}}
-	QueuedReply    = &Reply{singleStr: []byte("QUEUED")}
+	OKReply        = NewSingleStringReply("OK")
+	NilReply       = &Reply{commandType: ReplyTypeNil}
+	EmptyListReply = &Reply{commandType: ReplyEmptyList}
+	QueuedReply    = NewSingleStringReply("QUEUED")
 )
 
 type Reply struct {
-	err             error
-	number          int
-	bulkStringArray [][]byte
-	singleStr       []byte
-	bulk            bool
-	nilReply        bool
-	nested          bool
+	err         error
+	number      int
+	stringArray [][]byte
+	nested      bool
+	commandType byte
 }
 
 func NewNumberReply(number int) *Reply {
-	return &Reply{number: number, nilReply: false}
+	return &Reply{number: number, commandType: CommandTypeNumber}
 }
 
 func NewBulkValueReply(value []byte) *Reply {
 	return &Reply{
-		err:       nil,
-		number:    -1,
-		singleStr: value,
-		nilReply:  false,
-		bulk:      true,
+		commandType: CommandTypeBulk,
+		stringArray: [][]byte{value},
 	}
 }
 
 // NewBulkStringReply returns a reply with multi-lined Bulk String
 func NewBulkStringReply(value string) *Reply {
 	return &Reply{
-		err:       nil,
-		singleStr: []byte(value),
-		bulk:      true,
+		stringArray: [][]byte{[]byte(value)},
+		commandType: CommandTypeBulk,
 	}
 }
 
 // NewSingleStringReply returns a reply with Single-lined string
 func NewSingleStringReply(value string) *Reply {
 	return &Reply{
-		err:             nil,
-		number:          -1,
-		bulkStringArray: nil,
-		singleStr:       []byte(value),
-		nilReply:        false,
+		stringArray: [][]byte{[]byte(value)},
+		commandType: CommandTypeSingleLine,
 	}
 }
 
 func NewArrayReply(arr [][]byte) *Reply {
 	return &Reply{
-		err:             nil,
-		number:          -1,
-		bulkStringArray: arr,
-		nilReply:        false,
+		stringArray: arr,
+		commandType: CommandTypeArray,
 	}
 }
 
 func NewNestedArrayReply(arr [][]byte) *Reply {
 	return &Reply{
-		err:             nil,
-		number:          -1,
-		bulkStringArray: arr,
-		nilReply:        false,
-		nested:          true,
+		stringArray: arr,
+		nested:      true,
+		commandType: CommandTypeArray,
 	}
 }
 
@@ -81,19 +78,15 @@ func NewStringArrayReply(arr []string) *Reply {
 		bulkArr[i] = []byte(str)
 	}
 	return &Reply{
-		err:             nil,
-		number:          -1,
-		bulkStringArray: bulkArr,
-		nilReply:        false,
+		stringArray: bulkArr,
+		commandType: CommandTypeArray,
 	}
 }
 
 func NewErrorReply(err error) *Reply {
 	return &Reply{
-		err:             err,
-		number:          -1,
-		bulkStringArray: nil,
-		nilReply:        false,
+		err:         err,
+		commandType: CommandTypeError,
 	}
 }
 
@@ -101,58 +94,39 @@ func NewErrorReply(err error) *Reply {
 	Format Reply to RESP bytes
 */
 func (r *Reply) ToBytes() []byte {
-	if r.nilReply {
-		return []byte("$-1" + CRLF)
-	}
-	if r.singleStr != nil {
-		if r.bulk {
-			return []byte("$" + strconv.Itoa(len(r.singleStr)) + CRLF + string(r.singleStr) + CRLF)
-		} else {
-			return []byte("+" + string(r.singleStr) + CRLF)
-		}
-	} else if r.bulkStringArray != nil {
-		if len(r.bulkStringArray) == 0 {
-			return []byte("*0" + CRLF)
-		} else {
-			builder := strings.Builder{}
-			// * length
-			builder.WriteString("*" + strconv.Itoa(len(r.bulkStringArray)) + CRLF)
-			for _, bulk := range r.bulkStringArray {
-				if r.nested {
-					builder.Write(bulk)
-				} else {
-					if bulk == nil {
-						builder.WriteString("$-1" + CRLF)
-						continue
-					}
-					// Write $(len)\r\n{string}\r\n
-					builder.WriteString("$" + strconv.Itoa(len(bulk)) + CRLF)
-					builder.Write(bulk)
-					builder.WriteString(CRLF)
-				}
-			}
-			return []byte(builder.String())
-		}
-	} else if r.err != nil {
-		return []byte("-" + r.err.Error() + CRLF)
-	} else {
+	switch r.commandType {
+	case CommandTypeNumber:
 		return []byte(":" + strconv.Itoa(r.number) + CRLF)
+	case CommandTypeSingleLine:
+		return []byte("+" + string(r.stringArray[0]) + CRLF)
+	case CommandTypeError:
+		return []byte("-" + r.err.Error() + CRLF)
+	case CommandTypeBulk:
+		return []byte("$" + strconv.Itoa(len(r.stringArray[0])) + CRLF + string(r.stringArray[0]) + CRLF)
+	case ReplyTypeNil:
+		return []byte("$-1\r\n")
+	case ReplyEmptyList:
+		return []byte("*0\r\n")
+	case CommandTypeArray:
+		builder := strings.Builder{}
+		// * length
+		builder.WriteString("*" + strconv.Itoa(len(r.stringArray)) + CRLF)
+
+		for _, bulk := range r.stringArray {
+			if r.nested {
+				builder.Write(bulk)
+			} else {
+				if bulk == nil {
+					builder.WriteString("$-1" + CRLF)
+					continue
+				}
+				// Write $(len)\r\n{string}\r\n
+				builder.WriteString("$" + strconv.Itoa(len(bulk)) + CRLF)
+				builder.Write(bulk)
+				builder.WriteString(CRLF)
+			}
+		}
+		return []byte(builder.String())
 	}
-}
-
-func CreateNumberReply(number int) []byte {
-	return []byte(":" + strconv.Itoa(number) + CRLF)
-}
-
-func CreateSingleStringReply(value string) []byte {
-	return []byte("+" + value + CRLF)
-}
-
-func CreateBulkStringArrayReply(array []string) []byte {
-	builder := strings.Builder{}
-	builder.WriteString("*" + strconv.Itoa(len(array)) + CRLF)
-	for _, bulk := range array {
-		builder.WriteString("$" + strconv.Itoa(len(bulk)) + CRLF + bulk + CRLF)
-	}
-	return []byte(builder.String())
+	return nil
 }

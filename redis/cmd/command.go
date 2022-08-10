@@ -47,6 +47,18 @@ func NewSingleLineCommand(message []byte) *Command {
 	}
 }
 
+func NewNilCommand() *Command {
+	return &Command{
+		commandType: redis.ReplyTypeNil,
+	}
+}
+
+func NewEmptyListCommand() *Command {
+	return &Command{
+		commandType: redis.ReplyEmptyList,
+	}
+}
+
 func (c *Command) ToBytes() []byte {
 	parts := c.Parts()
 	if len(parts) == 1 {
