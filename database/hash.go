@@ -18,7 +18,7 @@ func init() {
 	RegisterCommandExecutor("hlen", execHLen, 1)
 	RegisterCommandExecutor("hmget", execHMGet, -2)
 	RegisterCommandExecutor("hsetnx", execHSetNX, 3)
-	RegisterCommandExecutor("hincrby", execHIncrBy, 2)
+	RegisterCommandExecutor("hincrby", execHIncrBy, 3)
 	RegisterCommandExecutor("hstrlen", execHStrLen, 2)
 	RegisterCommandExecutor("hvals", execHVals, 1)
 }
