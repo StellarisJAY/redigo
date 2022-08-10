@@ -11,12 +11,12 @@ import (
 )
 
 func init() {
-	RegisterCommandExecutor("sadd", execSAdd, -3)
-	RegisterCommandExecutor("sismember", execSIsMember, 1)
+	RegisterCommandExecutor("sadd", execSAdd, -2)
+	RegisterCommandExecutor("sismember", execSIsMember, 2)
 	RegisterCommandExecutor("smembers", execSMembers, 1)
 	RegisterCommandExecutor("srandmember", execSRandomMember, 2)
-	RegisterCommandExecutor("srem", execSRem, 2)
-	RegisterCommandExecutor("spop", execSPop, -3)
+	RegisterCommandExecutor("srem", execSRem, -2)
+	RegisterCommandExecutor("spop", execSPop, 2)
 	RegisterCommandExecutor("sdiff", execSDiff, 2)
 	RegisterCommandExecutor("sinter", execSInter, 2)
 	RegisterCommandExecutor("scard", execSCard, 1)
