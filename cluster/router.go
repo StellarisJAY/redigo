@@ -75,6 +75,9 @@ func init() {
 
 // normalCommandHandler 普通命令处理器
 func normalCommandHandler(cluster *Cluster, command redis.Command) *protocol.Reply {
+	if len(command.Args()) < 1 {
+		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError(command.Name()))
+	}
 	key := string(command.Args()[0])
 	// 通过选择器找到key所在的节点
 	peer := cluster.selector.SelectPeer(key)
@@ -86,7 +89,7 @@ func normalCommandHandler(cluster *Cluster, command redis.Command) *protocol.Rep
 	if client, ok := cluster.peers[peer]; ok {
 		// 转发命令并等待回复
 		reply := client.RelayCommand(command)
-		log.Printf("received command result from peer: %s, command: %v", peer, command.Parts())
+		log.Printf("received command result from peer: %s, command: %v", peer, reply)
 		return reply
 	}
 	return protocol.NewErrorReply(protocol.ClusterPeerNotFoundError)
