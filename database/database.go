@@ -19,33 +19,41 @@ type MultiDB struct {
 	executors  map[string]func(redis.Command) *protocol.Reply
 	aofHandler *aof.Handler
 	hub        *pubsub.Hub
+	memCounter *MemoryCounter
+}
+
+type MemoryCounter struct {
+	maxMemory  int64
+	usedMemory int64
 }
 
 func NewTempDB(dbSize int) *MultiDB {
 	db := &MultiDB{
-		dbSet:     make([]database.DB, dbSize),
-		cmdChan:   make(chan redis.Command, 0),
-		executors: make(map[string]func(redis.Command) *protocol.Reply),
+		dbSet:      make([]database.DB, dbSize),
+		cmdChan:    make(chan redis.Command, 0),
+		executors:  make(map[string]func(redis.Command) *protocol.Reply),
+		memCounter: &MemoryCounter{maxMemory: config.Properties.MaxMemory, usedMemory: 0},
 	}
 	db.initCommandExecutors()
 	// initialize single databases in db set
 	for i := 0; i < dbSize; i++ {
-		db.dbSet[i] = NewSingleDB(i)
+		db.dbSet[i] = NewSingleDB(i, db.memCounter)
 	}
 	return db
 }
 
 func NewMultiDB(dbSize, cmdChanSize int) *MultiDB {
 	db := &MultiDB{
-		dbSet:     make([]database.DB, dbSize),
-		cmdChan:   make(chan redis.Command, cmdChanSize),
-		executors: make(map[string]func(redis.Command) *protocol.Reply),
-		hub:       pubsub.MakeHub(),
+		dbSet:      make([]database.DB, dbSize),
+		cmdChan:    make(chan redis.Command, cmdChanSize),
+		executors:  make(map[string]func(redis.Command) *protocol.Reply),
+		hub:        pubsub.MakeHub(),
+		memCounter: &MemoryCounter{maxMemory: config.Properties.MaxMemory},
 	}
 	db.initCommandExecutors()
 	// initialize single databases in db set
 	for i := 0; i < dbSize; i++ {
-		db.dbSet[i] = NewSingleDB(i)
+		db.dbSet[i] = NewSingleDB(i, db.memCounter)
 	}
 	// initialize AOF
 	if config.Properties.AppendOnly {

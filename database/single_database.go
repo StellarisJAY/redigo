@@ -25,11 +25,10 @@ type SingleDB struct {
 	lruHead *database.Entry
 	lruTail *database.Entry
 
-	maxMemory  int64
-	usedMemory int64
+	memCounter *MemoryCounter
 }
 
-func NewSingleDB(idx int) *SingleDB {
+func NewSingleDB(idx int, counter *MemoryCounter) *SingleDB {
 	db := &SingleDB{
 		data:       dict.NewSimpleDict(),
 		ttlMap:     dict.NewSimpleDict(),
@@ -39,10 +38,10 @@ func NewSingleDB(idx int) *SingleDB {
 		addAof:     func(i [][]byte) {},
 		lruHead:    &database.Entry{},
 		lruTail:    &database.Entry{},
+		memCounter: counter,
 	}
 	db.lruHead.NextLRUEntry = db.lruTail
 	db.lruTail.PrevLRUEntry = db.lruHead
-	db.maxMemory = config.Properties.MaxMemory
 	return db
 }
 
@@ -276,7 +275,7 @@ func (db *SingleDB) Dump(key string) ([]byte, error) {
 
 // lruMoveEntryToTail 将entry移动到LRU队列尾部
 func (db *SingleDB) lruMoveEntryToTail(entry *database.Entry) {
-	if config.Properties.MaxMemory != -1 {
+	if db.memCounter.maxMemory != -1 {
 		db.lruRemoveEntry(entry)
 		db.lruAddEntry(entry)
 	}
@@ -300,13 +299,13 @@ func (db *SingleDB) lruAddEntry(entry *database.Entry) {
 
 // evict 内存淘汰，直到已占用内存达到小于等于目标值
 func (db *SingleDB) evict(targetMemory int64) {
-	for targetMemory < db.usedMemory {
+	for targetMemory < db.memCounter.usedMemory {
 		// 如果lru队列已经没有entry了
 		if entry := db.lruHead.NextLRUEntry; entry == db.lruTail {
 			break
 		} else {
 			db.lruRemoveEntry(entry)
-			db.usedMemory -= entry.DataSize
+			db.memCounter.usedMemory -= entry.DataSize
 			db.data.Remove(entry.Key)
 			log.Println("evict entry, key: ", entry.Key, ", value size: ", entry.DataSize, "bytes")
 		}
@@ -314,7 +313,7 @@ func (db *SingleDB) evict(targetMemory int64) {
 }
 
 func (db *SingleDB) freeMemoryIfNeeded(targetMemory int64) {
-	if config.Properties.MaxMemory == -1 {
+	if db.memCounter.maxMemory == -1 {
 		return
 	}
 	db.evict(targetMemory)
@@ -322,11 +321,11 @@ func (db *SingleDB) freeMemoryIfNeeded(targetMemory int64) {
 
 func (db *SingleDB) putEntry(entry *database.Entry) int {
 	// 放入新的数据前，先进行内存淘汰
-	db.freeMemoryIfNeeded(db.maxMemory - entry.DataSize)
+	db.freeMemoryIfNeeded(db.memCounter.maxMemory - entry.DataSize)
 	result := db.data.Put(entry.Key, entry)
 	if result != 0 {
 		db.lruAddEntry(entry)
-		db.usedMemory += entry.DataSize
+		db.memCounter.usedMemory += entry.DataSize
 	}
 	return result
 }
@@ -358,9 +357,9 @@ func (db *SingleDB) putIfExists(key string, value []byte) int {
 		oldSize := entry.DataSize
 		entry.DataSize = int64(len(value))
 		db.lruMoveEntryToTail(entry)
-		db.freeMemoryIfNeeded(db.maxMemory - entry.DataSize)
-		db.usedMemory += entry.DataSize
-		db.usedMemory -= oldSize
+		db.freeMemoryIfNeeded(db.memCounter.maxMemory - entry.DataSize)
+		db.memCounter.usedMemory += entry.DataSize
+		db.memCounter.usedMemory -= oldSize
 	}
 	return 0
 }
@@ -372,7 +371,7 @@ func (db *SingleDB) updateEntry(entry *database.Entry, value []byte) {
 	entry.DataSize = int64(len(value))
 	// 先更新数据，然后再淘汰内存
 	db.lruMoveEntryToTail(entry)
-	db.freeMemoryIfNeeded(db.maxMemory - entry.DataSize + oldSize)
-	db.usedMemory += entry.DataSize
-	db.usedMemory -= oldSize
+	db.freeMemoryIfNeeded(db.memCounter.maxMemory - entry.DataSize + oldSize)
+	db.memCounter.usedMemory += entry.DataSize
+	db.memCounter.usedMemory -= oldSize
 }
