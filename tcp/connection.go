@@ -146,3 +146,7 @@ func (c *Connection) GetWatching() map[string]int64 {
 func (c *Connection) Active() bool {
 	return c.active.Load().(bool)
 }
+
+func (c *Connection) RemoteAddr() string {
+	return c.Conn.RemoteAddr().String()
+}

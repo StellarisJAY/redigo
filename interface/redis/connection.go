@@ -22,4 +22,5 @@ type Connection interface {
 	UnWatch()
 
 	Active() bool
+	RemoteAddr() string
 }
