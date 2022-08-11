@@ -27,7 +27,7 @@ func main() {
 	if len(os.Args) > 1 {
 		config.LoadConfigs(os.Args[1])
 	} else {
-		config.LoadConfigs("./redis.conf")
+		config.LoadConfigs("./redis.yaml")
 	}
 	db := database.NewMultiDB(config.Properties.Databases, 1024)
 	var server *tcp.Server
