@@ -12,6 +12,7 @@ type Command struct {
 	parts       [][]byte
 	conn        redis.Connection
 	commandType byte
+	fromCluster bool
 }
 
 func NewEmptyCommand() *Command {
@@ -62,9 +63,9 @@ func NewEmptyListCommand() *Command {
 func (c *Command) ToBytes() []byte {
 	parts := c.Parts()
 	if len(parts) == 1 {
-		return createSingleStringReply(string(parts[0]))
+		return createSingleStringReply(string(parts[0]), c.fromCluster)
 	} else {
-		return createBulkStringArrayReply(parts)
+		return createBulkStringArrayReply(parts, c.fromCluster)
 	}
 }
 
@@ -108,12 +109,26 @@ func (c *Command) Type() byte {
 	return c.commandType
 }
 
-func createSingleStringReply(value string) []byte {
+func (c *Command) IsFromCluster() bool {
+	return c.fromCluster
+}
+
+func (c *Command) SetFromCluster(b bool) {
+	c.fromCluster = b
+}
+
+func createSingleStringReply(value string, fromCluster bool) []byte {
+	if fromCluster {
+		return []byte("!+" + value + CRLF)
+	}
 	return []byte("+" + value + CRLF)
 }
 
-func createBulkStringArrayReply(array [][]byte) []byte {
+func createBulkStringArrayReply(array [][]byte, fromCluster bool) []byte {
 	builder := strings.Builder{}
+	if fromCluster {
+		builder.WriteString("!")
+	}
 	builder.WriteString("*" + strconv.Itoa(len(array)) + CRLF)
 	for _, bulk := range array {
 		builder.WriteString("$" + strconv.Itoa(len(bulk)) + CRLF + string(bulk) + CRLF)

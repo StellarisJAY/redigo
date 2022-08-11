@@ -28,6 +28,11 @@ func Parse(reader *bufio.Reader) (*cmd.Command, error) {
 		return nil, err
 	}
 	var command *cmd.Command
+	fromCluster := false
+	if msg[0] == '!' {
+		fromCluster = true
+		msg = msg[1:]
+	}
 	switch msg[0] {
 	case redis.SingleLinePrefix:
 		command = cmd.NewSingleLineCommand(msg[1 : len(msg)-2])
@@ -45,6 +50,7 @@ func Parse(reader *bufio.Reader) (*cmd.Command, error) {
 		} else {
 			command = cmd.NewBulkStringCommand(bulk)
 		}
+		command.SetFromCluster(fromCluster)
 		return command, nil
 	case redis.ArrayPrefix:
 		// get Array size
@@ -53,15 +59,20 @@ func Parse(reader *bufio.Reader) (*cmd.Command, error) {
 			return nil, err
 		}
 		if size == 0 {
-			return cmd.NewEmptyListCommand(), nil
+			command = cmd.NewEmptyListCommand()
+			command.SetFromCluster(fromCluster)
+			return command, nil
 		}
 		// parse RESP array
 		if parts, err := readArray(reader, size); err != nil {
 			return nil, err
 		} else {
-			return cmd.NewCommand(parts), nil
+			command = cmd.NewCommand(parts)
+			command.SetFromCluster(fromCluster)
+			return command, nil
 		}
 	}
+	command.SetFromCluster(fromCluster)
 	return command, nil
 }
 

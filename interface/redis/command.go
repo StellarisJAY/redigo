@@ -16,6 +16,7 @@ const (
 	ArrayPrefix      = '*'
 	ErrorPrefix      = '-'
 	NumberPrefix     = ':'
+	ClusterPrefix    = '!'
 )
 
 type Command interface {
@@ -29,4 +30,6 @@ type Command interface {
 
 	ToBytes() []byte
 	Type() byte
+	IsFromCluster() bool
+	SetFromCluster(bool)
 }
