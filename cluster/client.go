@@ -84,6 +84,8 @@ func (pc *PeerClient) RelayCommand(command redis.Command) *protocol.Reply {
 		return protocol.NewErrorReply(protocol.ClusterPeerUnreachableError)
 	}
 	defer pc.connPool.Put(c)
+	// 设置命令来源集群peer
+	command.SetFromCluster(true)
 	return conn.sendCommand(ctx, command)
 }
 

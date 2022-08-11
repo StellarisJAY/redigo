@@ -48,6 +48,11 @@ func (c *Cluster) ExecuteLoop() error {
 }
 
 func (c *Cluster) Execute(command redis.Command) *protocol.Reply {
+	// 命令来自集群节点，调用本地数据库执行
+	if command.IsFromCluster() {
+		c.multiDB.SubmitCommand(command)
+		return nil
+	}
 	if handler, ok := router[command.Name()]; ok {
 		return handler(c, command)
 	} else {
@@ -65,4 +70,12 @@ func (c *Cluster) Len(dbIdx int) int {
 
 func (c *Cluster) OnConnectionClosed(conn redis.Connection) {
 	c.multiDB.OnConnectionClosed(conn)
+}
+
+func (c *Cluster) Peers() []*PeerClient {
+	clients := make([]*PeerClient, 0, len(c.peers))
+	for _, client := range c.peers {
+		clients = append(clients, client)
+	}
+	return clients
 }

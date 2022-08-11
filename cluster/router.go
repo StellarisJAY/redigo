@@ -12,6 +12,9 @@ type CommandRouter map[string]CommandHandler
 var router CommandRouter = make(map[string]CommandHandler)
 
 func init() {
+
+	router["keys"] = execKeys
+
 	router["del"] = normalCommandHandler
 	router["ttl"] = normalCommandHandler
 	router["pttl"] = normalCommandHandler
@@ -89,7 +92,7 @@ func normalCommandHandler(cluster *Cluster, command redis.Command) *protocol.Rep
 	if client, ok := cluster.peers[peer]; ok {
 		// 转发命令并等待回复
 		reply := client.RelayCommand(command)
-		log.Printf("received command result from peer: %s, command: %v", peer, reply)
+		log.Printf("received command result from peer: %s, command: %s", peer, string(reply.ToBytes()))
 		return reply
 	}
 	return protocol.NewErrorReply(protocol.ClusterPeerNotFoundError)
