@@ -304,6 +304,12 @@ func (db *SingleDB) evict(targetMemory int64) {
 		if entry := db.lruHead.NextLRUEntry; entry == db.lruTail {
 			break
 		} else {
+			// volatile-lru，跳过没有超时时间的key
+			if config.Properties.EvictPolicy == config.EvictVolatileLRU {
+				if _, ok := db.ttlMap.Get(entry.Key); ok {
+					continue
+				}
+			}
 			db.lruRemoveEntry(entry)
 			db.memCounter.usedMemory -= entry.DataSize
 			db.data.Remove(entry.Key)

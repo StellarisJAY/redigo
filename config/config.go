@@ -21,6 +21,7 @@ type ServerProperties struct {
 	AofFileName       string   `cfg:"appendfilename" yaml:"aofFileName"`
 	MaxMemory         int64    `cfg:"maxmemory" yaml:"maxMemory"`
 	MaxMemorySamples  int      `cfg:"maxmemory-samples" yaml:"maxMemorySamples"`
+	EvictPolicy       string   `yaml:"evictPolicy"`
 	DBFileName        string   `cfg:"dbfilename" yaml:"dbFileName"`
 	Address           string   `yaml:"address"`
 	EnableClusterMode bool     `yaml:"enableClusterMode"`
@@ -32,6 +33,9 @@ var Properties *ServerProperties
 const (
 	FsyncEverySec = "everysec"
 	FsyncNo       = "no"
+
+	EvictAllLRU      = "all-lru"
+	EvictVolatileLRU = "volatile-lru"
 )
 
 func init() {
@@ -47,6 +51,7 @@ func init() {
 		MaxMemory:         -1,
 		EnableClusterMode: false,
 		Peers:             []string{},
+		EvictPolicy:       EvictAllLRU,
 	}
 }
 
