@@ -3,8 +3,9 @@ databases: 16
 appendOnly: false
 aofFileName: appendonly-2.log
 dbFileName: dump.rdb
+self: 127.0.0.1:16382
 address: 127.0.0.1:6382
 enableClusterMode: true
 peers:
-  - 127.0.0.1:6381
-  - 127.0.0.1:6383
+  - 127.0.0.1:16381
+  - 127.0.0.1:16383
