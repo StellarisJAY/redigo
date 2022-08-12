@@ -6,22 +6,20 @@ import (
 	"io"
 	"net"
 	"redigo/interface/database"
-	"redigo/interface/redis"
-	"redigo/redis/parser"
-	"redigo/redis/protocol"
+	"redigo/redis"
 	"sync/atomic"
 )
 
 type Connection struct {
 	Conn       net.Conn
-	ReplyChan  chan *protocol.Reply
+	ReplyChan  chan *redis.RespCommand
 	db         database.DB
 	ctx        context.Context
 	cancel     context.CancelFunc
 	selectedDB int
 	multi      bool
 	watching   map[string]int64
-	cmdQueue   []redis.Command
+	cmdQueue   []*redis.RespCommand
 	active     atomic.Value
 }
 
@@ -29,7 +27,7 @@ func NewConnection(conn net.Conn, db database.DB) *Connection {
 	ctx, cancel := context.WithCancel(context.Background())
 	connect := &Connection{
 		Conn:       conn,
-		ReplyChan:  make(chan *protocol.Reply, 1024),
+		ReplyChan:  make(chan *redis.RespCommand, 1024),
 		db:         db,
 		cancel:     cancel,
 		ctx:        ctx,
@@ -49,7 +47,7 @@ func (c *Connection) ReadLoop() error {
 	reader := bufio.NewReader(c.Conn)
 	for {
 		//parse RESP
-		cmd, err := parser.Parse(reader)
+		cmd, err := redis.Decode(reader)
 		// push result to connection's write chan
 		if err != nil {
 			// Read failed, connection closed
@@ -71,7 +69,7 @@ func (c *Connection) WriteLoop() error {
 	for {
 		select {
 		case reply := <-c.ReplyChan:
-			_, err := c.Conn.Write(reply.ToBytes())
+			_, err := c.Conn.Write(redis.Encode(reply))
 			if err != nil {
 				return err
 			}
@@ -91,8 +89,8 @@ func (c *Connection) Close() {
 	c.cancel()
 }
 
-func (c *Connection) SendReply(reply *protocol.Reply) {
-	c.ReplyChan <- reply
+func (c *Connection) SendCommand(command *redis.RespCommand) {
+	c.ReplyChan <- command
 }
 
 func (c *Connection) SelectDB(index int) {
@@ -115,14 +113,14 @@ func (c *Connection) IsMulti() bool {
 	return c.multi
 }
 
-func (c *Connection) EnqueueCommand(command redis.Command) {
+func (c *Connection) EnqueueCommand(command *redis.RespCommand) {
 	if c.cmdQueue == nil {
-		c.cmdQueue = make([]redis.Command, 0)
+		c.cmdQueue = make([]*redis.RespCommand, 0)
 	}
 	c.cmdQueue = append(c.cmdQueue, command)
 }
 
-func (c *Connection) GetQueuedCommands() []redis.Command {
+func (c *Connection) GetQueuedCommands() []*redis.RespCommand {
 	return c.cmdQueue
 }
 

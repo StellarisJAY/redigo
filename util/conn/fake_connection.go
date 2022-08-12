@@ -1,18 +1,17 @@
 package conn
 
 import (
-	"redigo/interface/redis"
-	"redigo/redis/protocol"
+	"redigo/redis"
 )
 
 // FakeConnection 虚假连接，用于接收本地的异步返回结果
 type FakeConnection struct {
-	Replies  chan *protocol.Reply
+	Replies  chan *redis.RespCommand
 	RealConn redis.Connection
 }
 
 func NewFakeConnection(conn redis.Connection) *FakeConnection {
-	return &FakeConnection{Replies: make(chan *protocol.Reply), RealConn: conn}
+	return &FakeConnection{Replies: make(chan *redis.RespCommand), RealConn: conn}
 }
 
 func (f *FakeConnection) ReadLoop() error {
@@ -27,7 +26,7 @@ func (f *FakeConnection) Close() {
 	panic("method not allowed")
 }
 
-func (f *FakeConnection) SendReply(reply *protocol.Reply) {
+func (f *FakeConnection) SendCommand(reply *redis.RespCommand) {
 	f.Replies <- reply
 }
 
@@ -45,14 +44,6 @@ func (f *FakeConnection) SetMulti(b bool) {
 
 func (f *FakeConnection) IsMulti() bool {
 	return false
-}
-
-func (f *FakeConnection) EnqueueCommand(command redis.Command) {
-	panic("method not allowed")
-}
-
-func (f *FakeConnection) GetQueuedCommands() []redis.Command {
-	panic("method not allowed")
 }
 
 func (f *FakeConnection) AddWatching(key string, version int64) {
@@ -74,6 +65,13 @@ func (f *FakeConnection) Active() bool {
 }
 
 func (f *FakeConnection) RemoteAddr() string {
-	//TODO implement me
 	panic("implement me")
+}
+
+func (f *FakeConnection) EnqueueCommand(command *redis.RespCommand) {
+	panic("method not allowed")
+}
+
+func (f *FakeConnection) GetQueuedCommands() []*redis.RespCommand {
+	panic("method not allowed")
 }
