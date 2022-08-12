@@ -1,8 +1,7 @@
 package database
 
 import (
-	"redigo/interface/redis"
-	"redigo/redis/protocol"
+	"redigo/redis"
 	"time"
 )
 
@@ -13,7 +12,7 @@ type DB interface {
 	Close()
 	// ExecuteLoop continuously execute commands in serialized way
 	ExecuteLoop() error
-	Execute(command redis.Command) *protocol.Reply
+	Execute(command redis.Command) *redis.RespCommand
 	ForEach(dbIdx int, fun func(key string, entry *Entry, expire *time.Time) bool)
 	Len(dbIdx int) int
 

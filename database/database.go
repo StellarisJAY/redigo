@@ -5,10 +5,9 @@ import (
 	"redigo/aof"
 	"redigo/config"
 	"redigo/interface/database"
-	"redigo/interface/redis"
 	"redigo/pubsub"
 	"redigo/rdb"
-	"redigo/redis/protocol"
+	"redigo/redis"
 	"strconv"
 	"time"
 )
@@ -16,7 +15,7 @@ import (
 type MultiDB struct {
 	dbSet      []database.DB
 	cmdChan    chan redis.Command
-	executors  map[string]func(redis.Command) *protocol.Reply
+	executors  map[string]func(redis.Command) *redis.RespCommand
 	aofHandler *aof.Handler
 	hub        *pubsub.Hub
 	memCounter *MemoryCounter
@@ -31,7 +30,7 @@ func NewTempDB(dbSize int) *MultiDB {
 	db := &MultiDB{
 		dbSet:      make([]database.DB, dbSize),
 		cmdChan:    make(chan redis.Command, 0),
-		executors:  make(map[string]func(redis.Command) *protocol.Reply),
+		executors:  make(map[string]func(redis.Command) *redis.RespCommand),
 		memCounter: &MemoryCounter{maxMemory: config.Properties.MaxMemory, usedMemory: 0},
 	}
 	db.initCommandExecutors()
@@ -46,7 +45,7 @@ func NewMultiDB(dbSize, cmdChanSize int) *MultiDB {
 	db := &MultiDB{
 		dbSet:      make([]database.DB, dbSize),
 		cmdChan:    make(chan redis.Command, cmdChanSize),
-		executors:  make(map[string]func(redis.Command) *protocol.Reply),
+		executors:  make(map[string]func(redis.Command) *redis.RespCommand),
 		hub:        pubsub.MakeHub(),
 		memCounter: &MemoryCounter{maxMemory: config.Properties.MaxMemory},
 	}
@@ -86,8 +85,8 @@ func NewMultiDB(dbSize, cmdChanSize int) *MultiDB {
 
 // Register MultiDB commands here
 func (m *MultiDB) initCommandExecutors() {
-	m.executors["command"] = func(command redis.Command) *protocol.Reply {
-		return protocol.OKReply
+	m.executors["command"] = func(command redis.Command) *redis.RespCommand {
+		return redis.OKCommand
 	}
 	m.executors["select"] = m.execSelectDB
 	m.executors["ping"] = m.execPing
@@ -125,7 +124,7 @@ func (m *MultiDB) ExecuteLoop() error {
 		// execute command and get a reply if command is not dispatched to single database
 		reply := m.Execute(cmd)
 		if reply != nil {
-			cmd.Connection().SendReply(reply)
+			cmd.Connection().SendCommand(reply)
 		}
 	}
 }
@@ -137,7 +136,7 @@ func (m *MultiDB) Len(dbIdx int) int {
 	return 0
 }
 
-func (m *MultiDB) Execute(command redis.Command) *protocol.Reply {
+func (m *MultiDB) Execute(command redis.Command) *redis.RespCommand {
 	conn := command.Connection()
 	name := command.Name()
 	if name == "multi" {
@@ -156,7 +155,7 @@ func (m *MultiDB) OnConnectionClosed(conn redis.Connection) {
 	m.hub.UnSubscribeAll(conn)
 }
 
-func (m *MultiDB) executeCommand(command redis.Command) *protocol.Reply {
+func (m *MultiDB) executeCommand(command redis.Command) *redis.RespCommand {
 	cmdName := command.Name()
 	if exec, ok := m.executors[cmdName]; ok {
 		return exec(command)
@@ -174,25 +173,25 @@ func (m *MultiDB) ForEach(dbIdx int, fun func(key string, entry *database.Entry,
 	}
 }
 
-func (m *MultiDB) execSelectDB(command redis.Command) *protocol.Reply {
+func (m *MultiDB) execSelectDB(command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if len(args) != 1 {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("select"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("select"))
 	}
 	index, err := strconv.Atoi(string(args[0]))
 	// check database index
 	if err != nil {
-		return protocol.NewErrorReply(protocol.InvalidDBIndexError)
+		return redis.NewErrorCommand(redis.InvalidDBIndexError)
 	} else if index >= len(m.dbSet) {
-		return protocol.NewErrorReply(protocol.DBIndexOutOfRangeError)
+		return redis.NewErrorCommand(redis.DBIndexOutOfRangeError)
 	} else {
 		connection := command.Connection()
 		connection.SelectDB(index)
-		return protocol.OKReply
+		return redis.OKCommand
 	}
 }
 
-func (m *MultiDB) execPing(command redis.Command) *protocol.Reply {
+func (m *MultiDB) execPing(command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	var message string
 	if len(args) < 1 {
@@ -200,63 +199,63 @@ func (m *MultiDB) execPing(command redis.Command) *protocol.Reply {
 	} else {
 		message = string(args[0])
 	}
-	return protocol.NewSingleStringReply(message)
+	return redis.NewSingleLineCommand([]byte(message))
 }
 
-func (m *MultiDB) execBGRewriteAOF(command redis.Command) *protocol.Reply {
+func (m *MultiDB) execBGRewriteAOF(command redis.Command) *redis.RespCommand {
 	err := m.aofHandler.StartRewrite()
 	if err != nil {
-		return protocol.NewErrorReply(err)
+		return redis.NewErrorCommand(err)
 	}
-	return protocol.NewSingleStringReply("Background append only file rewriting started")
+	return redis.NewSingleLineCommand([]byte("Background append only file rewriting started"))
 }
 
-func (m *MultiDB) execDBSize(command redis.Command) *protocol.Reply {
+func (m *MultiDB) execDBSize(command redis.Command) *redis.RespCommand {
 	conn := command.Connection()
 	index := conn.DBIndex()
-	return protocol.NewNumberReply(m.Len(index))
+	return redis.NewNumberCommand(m.Len(index))
 }
 
-func (m *MultiDB) execFlushDB(command redis.Command) *protocol.Reply {
+func (m *MultiDB) execFlushDB(command redis.Command) *redis.RespCommand {
 	conn := command.Connection()
 	index := conn.DBIndex()
 	args := command.Args()
 	if len(args) > 1 {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("FLUSHDB"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("FLUSHDB"))
 	}
 	// check if flush in async mode
 	async := len(args) == 1 && string(args[0]) == "ASYNC"
 	m.dbSet[index].(*SingleDB).flushDB(async)
 	// use single database to write AOF
 	m.dbSet[index].(*SingleDB).addAof([][]byte{[]byte("FLUSHDB")})
-	return protocol.OKReply
+	return redis.OKCommand
 }
 
-func (m *MultiDB) execMulti(command redis.Command) *protocol.Reply {
+func (m *MultiDB) execMulti(command redis.Command) *redis.RespCommand {
 	conn := command.Connection()
 	return StartMulti(conn)
 }
 
-func (m *MultiDB) execMultiExec(command redis.Command) *protocol.Reply {
+func (m *MultiDB) execMultiExec(command redis.Command) *redis.RespCommand {
 	conn := command.Connection()
 	if !conn.IsMulti() {
-		return protocol.NewErrorReply(protocol.ExecWithoutMultiError)
+		return redis.NewErrorCommand(redis.ExecWithoutMultiError)
 	}
 	return Exec(m, conn)
 }
 
-func (m *MultiDB) execMultiDiscard(command redis.Command) *protocol.Reply {
+func (m *MultiDB) execMultiDiscard(command redis.Command) *redis.RespCommand {
 	conn := command.Connection()
 	return Discard(conn)
 }
 
-func (m *MultiDB) execUnWatch(command redis.Command) *protocol.Reply {
+func (m *MultiDB) execUnWatch(command redis.Command) *redis.RespCommand {
 	return UnWatch(command.Connection())
 }
 
-func (m *MultiDB) execWatch(command redis.Command) *protocol.Reply {
+func (m *MultiDB) execWatch(command redis.Command) *redis.RespCommand {
 	if len(command.Args()) == 0 {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("watch"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("watch"))
 	}
 	conn := command.Connection()
 	keys := make([]string, len(command.Args()))
@@ -266,25 +265,25 @@ func (m *MultiDB) execWatch(command redis.Command) *protocol.Reply {
 	return Watch(m.dbSet[conn.DBIndex()].(*SingleDB), conn, keys)
 }
 
-func (m *MultiDB) execSubscribe(command redis.Command) *protocol.Reply {
+func (m *MultiDB) execSubscribe(command redis.Command) *redis.RespCommand {
 	if len(command.Args()) == 0 {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("subscribe"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("subscribe"))
 	}
 	m.hub.Subscribe(command.Connection(), command.Args())
 	return nil
 }
 
-func (m *MultiDB) execPublish(command redis.Command) *protocol.Reply {
+func (m *MultiDB) execPublish(command redis.Command) *redis.RespCommand {
 	if len(command.Args()) != 2 {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("publish"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("publish"))
 	}
 	args := command.Args()
-	return protocol.NewNumberReply(m.hub.Publish(string(args[0]), args[1]))
+	return redis.NewNumberCommand(m.hub.Publish(string(args[0]), args[1]))
 }
 
-func (m *MultiDB) execPSubscribe(command redis.Command) *protocol.Reply {
+func (m *MultiDB) execPSubscribe(command redis.Command) *redis.RespCommand {
 	if len(command.Args()) == 0 {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("psubscribe"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("psubscribe"))
 	}
 	patterns := make([]string, len(command.Args()))
 	for i, arg := range command.Args() {
@@ -294,21 +293,21 @@ func (m *MultiDB) execPSubscribe(command redis.Command) *protocol.Reply {
 	return nil
 }
 
-func (m *MultiDB) execMove(command redis.Command) *protocol.Reply {
+func (m *MultiDB) execMove(command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if len(args) != 2 {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("move"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("move"))
 	}
 	key := string(args[0])
 	// parse database index, check if index in range
 	dbIndex, err := strconv.Atoi(string(args[1]))
 	if err != nil || dbIndex < 0 || dbIndex >= config.Properties.Databases {
-		return protocol.NewErrorReply(protocol.ValueNotIntegerOrOutOfRangeError)
+		return redis.NewErrorCommand(redis.ValueNotIntegerOrOutOfRangeError)
 	}
 	currentIndex := command.Connection().DBIndex()
 	// target database is current database
 	if dbIndex == currentIndex {
-		return protocol.OKReply
+		return redis.OKCommand
 	}
 	currentDB := m.dbSet[currentIndex].(*SingleDB)
 	targetDB := m.dbSet[dbIndex].(*SingleDB)
@@ -318,12 +317,12 @@ func (m *MultiDB) execMove(command redis.Command) *protocol.Reply {
 	_, duplicate := targetDB.getEntry(key)
 	// if key doesn't exist or target database already has key
 	if !exists || duplicate {
-		return protocol.NewNumberReply(0)
+		return redis.NewNumberCommand(0)
 	}
 	// remove key in current db, put key into target db
 	_ = currentDB.data.Remove(key)
 	_ = targetDB.data.Put(key, entry)
-	return protocol.NewNumberReply(1)
+	return redis.NewNumberCommand(1)
 }
 
 func (m *MultiDB) getVersion(dbIndex int, key string) int64 {
@@ -334,24 +333,24 @@ func (m *MultiDB) getVersion(dbIndex int, key string) int64 {
 	return db.(*SingleDB).getVersion(key)
 }
 
-func (m *MultiDB) execSave(command redis.Command) *protocol.Reply {
+func (m *MultiDB) execSave(command redis.Command) *redis.RespCommand {
 	// prevent running BGSave and Save at the same time
 	if !m.aofHandler.RewriteStarted.CompareAndSwap(false, true) {
-		return protocol.NewErrorReply(protocol.BackgroundSaveInProgressError)
+		return redis.NewErrorCommand(redis.BackgroundSaveInProgressError)
 	}
 	defer m.aofHandler.RewriteStarted.Store(false)
 	startTime := time.Now()
 	err := rdb.Save(m)
 	if err != nil {
-		return protocol.NilReply
+		return redis.NilCommand
 	}
 	log.Println("RDB saved, time used: ", time.Now().Sub(startTime).Milliseconds(), "ms")
-	return protocol.OKReply
+	return redis.OKCommand
 }
 
-func (m *MultiDB) execBGSave(command redis.Command) *protocol.Reply {
+func (m *MultiDB) execBGSave(command redis.Command) *redis.RespCommand {
 	if !m.aofHandler.RewriteStarted.CompareAndSwap(false, true) {
-		return protocol.NewErrorReply(protocol.BackgroundSaveInProgressError)
+		return redis.NewErrorCommand(redis.BackgroundSaveInProgressError)
 	}
 	startTime := time.Now()
 	// get the snapshot of current memory
@@ -378,5 +377,5 @@ func (m *MultiDB) execBGSave(command redis.Command) *protocol.Reply {
 			log.Println("BGSave RDB finished: ", time.Now().Sub(startTime).Milliseconds(), "ms")
 		}
 	}(snapshot, startTime)
-	return protocol.NewSingleStringReply("Background saving started")
+	return redis.NewSingleLineCommand([]byte("Background saving started"))
 }

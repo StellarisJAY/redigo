@@ -7,8 +7,8 @@ import (
 	"redigo/datastruct/dict"
 	"redigo/datastruct/lock"
 	"redigo/interface/database"
-	"redigo/interface/redis"
 	"redigo/rdb"
+	"redigo/redis"
 	"redigo/redis/protocol"
 	"redigo/util/timewheel"
 	"time"
@@ -57,7 +57,7 @@ func (db *SingleDB) SubmitCommand(command redis.Command) {
 	Execute a command
 	Finds the executor in executor map, then call execFunc to handle it
 */
-func (db *SingleDB) Execute(command redis.Command) *protocol.Reply {
+func (db *SingleDB) Execute(command redis.Command) *redis.RespCommand {
 	cmd := command.Name()
 	if cmd == "keys" {
 		// get all keys from db, but don't match pattern now
@@ -65,7 +65,7 @@ func (db *SingleDB) Execute(command redis.Command) *protocol.Reply {
 		// start a new goroutine to do pattern matching
 		go func(command redis.Command, keys []string) {
 			reply := execKeys(db, command, keys)
-			command.Connection().SendReply(reply)
+			command.Connection().SendCommand(reply)
 		}(command, keys)
 		return nil
 	} else {
@@ -75,7 +75,7 @@ func (db *SingleDB) Execute(command redis.Command) *protocol.Reply {
 			return reply
 		} else {
 			// command executor doesn't exist, send unknown command to client
-			return protocol.NewErrorReply(protocol.CreateUnknownCommandError(cmd))
+			return redis.NewErrorCommand(redis.CreateUnknownCommandError(cmd))
 		}
 	}
 }
