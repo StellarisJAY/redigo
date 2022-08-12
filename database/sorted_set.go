@@ -4,8 +4,7 @@ import (
 	"math"
 	"redigo/datastruct/zset"
 	"redigo/interface/database"
-	"redigo/interface/redis"
-	"redigo/redis/protocol"
+	"redigo/redis"
 	"strconv"
 	"strings"
 )
@@ -27,10 +26,10 @@ func init() {
 	RegisterCommandExecutor("zrangebyscore", execZRangeByScore, -3)
 }
 
-func execZAdd(db *SingleDB, command redis.Command) *protocol.Reply {
+func execZAdd(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) || (len(args)-1)%2 != 0 {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("ZADD"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("ZADD"))
 	}
 	count := len(args) - 1
 	key := string(args[0])
@@ -39,7 +38,7 @@ func execZAdd(db *SingleDB, command redis.Command) *protocol.Reply {
 	for i := 0; i < count; i += 2 {
 		score, err := strconv.ParseFloat(string(eleArgs[i]), 64)
 		if err != nil {
-			return protocol.NewErrorReply(protocol.ValueNotFloatError)
+			return redis.NewErrorCommand(redis.ValueNotFloatError)
 		}
 		elements[i/2] = zset.Element{
 			Member: string(eleArgs[i+1]),
@@ -49,87 +48,87 @@ func execZAdd(db *SingleDB, command redis.Command) *protocol.Reply {
 
 	zs, err := getOrInitSortedSet(db, key)
 	if err != nil {
-		return protocol.NewErrorReply(err)
+		return redis.NewErrorCommand(err)
 	}
 	result := 0
 	for _, ele := range elements {
 		result += zs.Add(ele.Member, ele.Score)
 	}
 	db.addAof(command.Parts())
-	return protocol.NewNumberReply(result)
+	return redis.NewNumberCommand(result)
 }
 
-func execZScore(db *SingleDB, command redis.Command) *protocol.Reply {
+func execZScore(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("ZSCORE"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("ZSCORE"))
 	}
 	zs, err := getSortedSet(db, string(args[0]))
 	if err != nil {
-		return protocol.NewErrorReply(err)
+		return redis.NewErrorCommand(err)
 	}
 	if zs != nil {
 		element, exists := zs.GetScore(string(args[1]))
 		if exists {
-			return protocol.NewBulkStringReply(strconv.FormatFloat(element.Score, 'f', -1, 64))
+			return redis.NewBulkStringCommand([]byte(strconv.FormatFloat(element.Score, 'f', -1, 64)))
 		}
 	}
-	return protocol.NilReply
+	return redis.NilCommand
 }
 
-func execZRem(db *SingleDB, command redis.Command) *protocol.Reply {
+func execZRem(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("ZREM"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("ZREM"))
 	}
 	zs, err := getSortedSet(db, string(args[0]))
 	if err != nil {
-		return protocol.NewErrorReply(err)
+		return redis.NewErrorCommand(err)
 	}
 	if zs == nil {
-		return protocol.NilReply
+		return redis.NilCommand
 	}
 	result := 0
 	for _, member := range args[1:] {
 		result += zs.Remove(string(member))
 	}
 	db.addAof(command.Parts())
-	return protocol.NewNumberReply(result)
+	return redis.NewNumberCommand(result)
 }
 
-func execZRank(db *SingleDB, command redis.Command) *protocol.Reply {
+func execZRank(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("ZRANK"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("ZRANK"))
 	}
 	zs, err := getSortedSet(db, string(args[0]))
 	if err != nil {
-		return protocol.NewErrorReply(err)
+		return redis.NewErrorCommand(err)
 	}
 	if zs != nil {
 		if rank := zs.Rank(string(args[1])); rank != -1 {
-			return protocol.NewNumberReply(int(rank))
+			return redis.NewNumberCommand(int(rank))
 		}
 	}
-	return protocol.NilReply
+	return redis.NilCommand
 }
 
-func execPopMax(db *SingleDB, command redis.Command) *protocol.Reply {
+func execPopMax(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("ZPOPMAX"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("ZPOPMAX"))
 	}
 	count := 1
 	if len(args) > 1 {
 		n, err := strconv.Atoi(string(args[1]))
 		if err != nil {
-			return protocol.NewErrorReply(err)
+			return redis.NewErrorCommand(err)
 		}
 		count = n
 	}
 	zs, err := getSortedSet(db, string(args[0]))
 	if err != nil {
-		return protocol.NewErrorReply(err)
+		return redis.NewErrorCommand(err)
 	}
 	if zs != nil && zs.Size() != 0 {
 		if zs.Size() < count {
@@ -145,27 +144,27 @@ func execPopMax(db *SingleDB, command redis.Command) *protocol.Reply {
 			}
 		}
 		db.addAof(command.Parts())
-		return protocol.NewStringArrayReply(result)
+		return redis.NewStringArrayCommand(result)
 	}
-	return protocol.EmptyListReply
+	return redis.EmptyListCommand
 }
 
-func execPopMin(db *SingleDB, command redis.Command) *protocol.Reply {
+func execPopMin(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("ZPOPMIN"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("ZPOPMIN"))
 	}
 	count := 1
 	if len(args) > 1 {
 		n, err := strconv.Atoi(string(args[1]))
 		if err != nil {
-			return protocol.NewErrorReply(err)
+			return redis.NewErrorCommand(err)
 		}
 		count = n
 	}
 	zs, err := getSortedSet(db, string(args[0]))
 	if err != nil {
-		return protocol.NewErrorReply(err)
+		return redis.NewErrorCommand(err)
 	}
 	if zs != nil && zs.Size() != 0 {
 		if zs.Size() < count {
@@ -181,36 +180,36 @@ func execPopMin(db *SingleDB, command redis.Command) *protocol.Reply {
 			}
 		}
 		db.addAof(command.Parts())
-		return protocol.NewStringArrayReply(result)
+		return redis.NewStringArrayCommand(result)
 	}
-	return protocol.EmptyListReply
+	return redis.EmptyListCommand
 }
 
-func execZCard(db *SingleDB, command redis.Command) *protocol.Reply {
+func execZCard(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("ZCARD"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("ZCARD"))
 	}
 	sortedSet, err := getSortedSet(db, string(args[0]))
 	if err != nil {
-		return protocol.NewErrorReply(err)
+		return redis.NewErrorCommand(err)
 	}
 	if sortedSet != nil {
-		return protocol.NewNumberReply(sortedSet.Size())
+		return redis.NewNumberCommand(sortedSet.Size())
 	}
-	return protocol.NewNumberReply(0)
+	return redis.NewNumberCommand(0)
 }
 
-func execZRange(db *SingleDB, command redis.Command) *protocol.Reply {
+func execZRange(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("ZRANGE"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("ZRANGE"))
 	}
 	// parse start and end values
 	start, err1 := strconv.Atoi(string(args[1]))
 	end, err2 := strconv.Atoi(string(args[2]))
 	if err1 != nil || err2 != nil {
-		return protocol.NewErrorReply(protocol.HashValueNotIntegerError)
+		return redis.NewErrorCommand(redis.HashValueNotIntegerError)
 	}
 	withScores := false
 	if len(args) == 4 && string(args[3]) == "WITHSCORES" {
@@ -219,12 +218,12 @@ func execZRange(db *SingleDB, command redis.Command) *protocol.Reply {
 	// get sorted set structure
 	sortedSet, err := getSortedSet(db, string(args[0]))
 	if err != nil {
-		return protocol.NewErrorReply(err)
+		return redis.NewErrorCommand(err)
 	}
 	if sortedSet != nil {
 		elements := sortedSet.Range(start, end)
 		if elements == nil {
-			return protocol.EmptyListReply
+			return redis.EmptyListCommand
 		}
 		var result []string
 		if withScores {
@@ -241,20 +240,20 @@ func execZRange(db *SingleDB, command redis.Command) *protocol.Reply {
 				result[i] = e.Member
 			}
 		}
-		return protocol.NewStringArrayReply(result)
+		return redis.NewStringArrayCommand(result)
 	}
-	return protocol.EmptyListReply
+	return redis.EmptyListCommand
 }
 
-func execZRangeByScore(db *SingleDB, command redis.Command) *protocol.Reply {
+func execZRangeByScore(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("ZRANGEBYSCORE"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("ZRANGEBYSCORE"))
 	}
 	// parse interval, get min,max value and open options
 	min, max, lOpen, rOpen, err := parseInterval(string(args[1]), string(args[2]))
 	if err != nil {
-		return protocol.NewErrorReply(protocol.ValueNotFloatError)
+		return redis.NewErrorCommand(redis.ValueNotFloatError)
 	}
 	withScores := false
 	offset := 0
@@ -268,22 +267,22 @@ func execZRangeByScore(db *SingleDB, command redis.Command) *protocol.Reply {
 				i++
 			} else if arg == "LIMIT" {
 				if i >= len(additions)-2 {
-					return protocol.NewErrorReply(protocol.SyntaxError)
+					return redis.NewErrorCommand(redis.SyntaxError)
 				}
 				offset, err = strconv.Atoi(string(additions[i+1]))
 				count, err = strconv.Atoi(string(additions[i+2]))
 				if err != nil {
-					return protocol.NewErrorReply(protocol.ValueNotIntegerOrOutOfRangeError)
+					return redis.NewErrorCommand(redis.ValueNotIntegerOrOutOfRangeError)
 				}
 				i += 3
 			} else {
-				return protocol.NewErrorReply(protocol.SyntaxError)
+				return redis.NewErrorCommand(redis.SyntaxError)
 			}
 		}
 	}
 	set, err := getSortedSet(db, string(args[0]))
 	if err != nil {
-		return protocol.NewErrorReply(protocol.WrongTypeOperationError)
+		return redis.NewErrorCommand(redis.WrongTypeOperationError)
 	}
 	if count == -1 {
 		count = set.Size()
@@ -304,7 +303,7 @@ func execZRangeByScore(db *SingleDB, command redis.Command) *protocol.Reply {
 			result[i] = e.Member
 		}
 	}
-	return protocol.NewStringArrayReply(result)
+	return redis.NewStringArrayCommand(result)
 }
 
 func parseInterval(arg1, arg2 string) (min, max float64, lOpen, rOpen bool, err error) {
@@ -347,7 +346,7 @@ func getSortedSet(db *SingleDB, key string) (*zset.SortedSet, error) {
 		if isSortedSet(*entry) {
 			return entry.Data.(*zset.SortedSet), nil
 		}
-		return nil, protocol.WrongTypeOperationError
+		return nil, redis.WrongTypeOperationError
 	}
 }
 
@@ -361,6 +360,6 @@ func getOrInitSortedSet(db *SingleDB, key string) (*zset.SortedSet, error) {
 		if isSortedSet(*entry) {
 			return entry.Data.(*zset.SortedSet), nil
 		}
-		return nil, protocol.WrongTypeOperationError
+		return nil, redis.WrongTypeOperationError
 	}
 }

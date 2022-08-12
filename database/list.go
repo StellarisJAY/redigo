@@ -3,8 +3,7 @@ package database
 import (
 	"redigo/datastruct/list"
 	"redigo/interface/database"
-	"redigo/interface/redis"
-	"redigo/redis/protocol"
+	"redigo/redis"
 	"reflect"
 	"strconv"
 )
@@ -20,94 +19,94 @@ func init() {
 	RegisterCommandExecutor("rpoplpush", execRPopLPush, 2)
 }
 
-func execLPush(db *SingleDB, command redis.Command) *protocol.Reply {
+func execLPush(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("lpush"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("lpush"))
 	}
 	linkedList, err := getOrInitLinkedList(db, string(args[0]))
 	if err != nil {
-		return protocol.NewErrorReply(err)
+		return redis.NewErrorCommand(err)
 	}
 	for _, arg := range args[1:] {
 		linkedList.AddLeft(arg)
 	}
 	db.addAof(command.Parts())
-	return protocol.NewNumberReply(linkedList.Size())
+	return redis.NewNumberCommand(linkedList.Size())
 }
 
-func execLPop(db *SingleDB, command redis.Command) *protocol.Reply {
+func execLPop(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("lpush"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("lpush"))
 	}
 	linkedList, err := getLinkedList(db, string(args[0]))
 	if err != nil {
-		return protocol.NewErrorReply(err)
+		return redis.NewErrorCommand(err)
 	}
 	if linkedList != nil {
 		left := linkedList.RemoveLeft()
 		if left != nil {
 			db.addAof(command.Parts())
-			return protocol.NewBulkValueReply(left)
+			return redis.NewBulkStringCommand(left)
 		} else {
-			return protocol.NilReply
+			return redis.NilCommand
 		}
 	}
-	return protocol.NilReply
+	return redis.NilCommand
 }
 
-func execRPush(db *SingleDB, command redis.Command) *protocol.Reply {
+func execRPush(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("rpush"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("rpush"))
 	}
 	linkedList, err := getOrInitLinkedList(db, string(args[0]))
 	if err != nil {
-		return protocol.NewErrorReply(err)
+		return redis.NewErrorCommand(err)
 	}
 	for _, arg := range args[1:] {
 		linkedList.AddRight(arg)
 	}
 	db.addAof(command.Parts())
-	return protocol.NewNumberReply(linkedList.Size())
+	return redis.NewNumberCommand(linkedList.Size())
 }
 
-func execRPop(db *SingleDB, command redis.Command) *protocol.Reply {
+func execRPop(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("rpop"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("rpop"))
 	}
 	linkedList, err := getLinkedList(db, string(args[0]))
 	if err != nil {
-		return protocol.NewErrorReply(err)
+		return redis.NewErrorCommand(err)
 	}
 	if linkedList != nil {
 		// pop right element
 		right := linkedList.RemoveRight()
 		if right != nil {
 			db.addAof(command.Parts())
-			return protocol.NewBulkValueReply(right)
+			return redis.NewBulkStringCommand(right)
 		}
 	}
-	return protocol.NilReply
+	return redis.NilCommand
 }
 
-func execLRange(db *SingleDB, command redis.Command) *protocol.Reply {
+func execLRange(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("lrange"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("lrange"))
 	}
 	// parse start index and end index
 	start, err1 := strconv.Atoi(string(args[1]))
 	end, err2 := strconv.Atoi(string(args[2]))
 	if err1 != nil || err2 != nil {
-		return protocol.NewErrorReply(protocol.ValueNotIntegerOrOutOfRangeError)
+		return redis.NewErrorCommand(redis.ValueNotIntegerOrOutOfRangeError)
 	}
 
 	linkedList, err := getLinkedList(db, string(args[0]))
 	if err != nil {
-		return protocol.NewErrorReply(err)
+		return redis.NewErrorCommand(err)
 	}
 	if linkedList != nil {
 		if start < 0 {
@@ -117,26 +116,26 @@ func execLRange(db *SingleDB, command redis.Command) *protocol.Reply {
 			end = linkedList.Size() + end
 		}
 		if result := linkedList.LeftRange(start, end); result != nil {
-			return protocol.NewArrayReply(result)
+			return redis.NewArrayCommand(result)
 		}
 	}
-	return protocol.EmptyListReply
+	return redis.EmptyListCommand
 }
 
-func execLIndex(db *SingleDB, command redis.Command) *protocol.Reply {
+func execLIndex(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("LINDEX"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("LINDEX"))
 	}
 	// check index arg
 	index, err := strconv.Atoi(string(args[1]))
 	if err != nil {
-		return protocol.NewErrorReply(protocol.ValueNotIntegerOrOutOfRangeError)
+		return redis.NewErrorCommand(redis.ValueNotIntegerOrOutOfRangeError)
 	}
 	// get linked list data structure
 	linkedList, err := getLinkedList(db, string(args[0]))
 	if err != nil {
-		return protocol.NewErrorReply(err)
+		return redis.NewErrorCommand(err)
 	}
 	if linkedList != nil {
 		// set index to positive value
@@ -145,44 +144,44 @@ func execLIndex(db *SingleDB, command redis.Command) *protocol.Reply {
 		}
 		// out of range
 		if index >= linkedList.Size() {
-			return protocol.NewErrorReply(protocol.ValueNotIntegerOrOutOfRangeError)
+			return redis.NewErrorCommand(redis.ValueNotIntegerOrOutOfRangeError)
 		}
-		return protocol.NewBulkValueReply(linkedList.Get(index))
+		return redis.NewBulkStringCommand(linkedList.Get(index))
 	}
-	return protocol.NilReply
+	return redis.NilCommand
 }
 
-func execLLen(db *SingleDB, command redis.Command) *protocol.Reply {
+func execLLen(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("LLEN"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("LLEN"))
 	}
 	// get linked list data structure
 	linkedList, err := getLinkedList(db, string(args[0]))
 	if err != nil {
-		return protocol.NewErrorReply(err)
+		return redis.NewErrorCommand(err)
 	}
 	if linkedList != nil {
-		return protocol.NewNumberReply(linkedList.Size())
+		return redis.NewNumberCommand(linkedList.Size())
 	}
-	return protocol.NewNumberReply(0)
+	return redis.NewNumberCommand(0)
 }
 
-func execRPopLPush(db *SingleDB, command redis.Command) *protocol.Reply {
+func execRPopLPush(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("RPopLPush"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("RPopLPush"))
 	}
 	srcList, err1 := getLinkedList(db, string(args[0]))
 	if err1 != nil {
-		return protocol.NewErrorReply(err1)
+		return redis.NewErrorCommand(err1)
 	}
 	if srcList == nil || srcList.Size() == 0 {
-		return protocol.NilReply
+		return redis.NilCommand
 	}
 	destList, err2 := getOrInitLinkedList(db, string(args[1]))
 	if err2 != nil {
-		return protocol.NewErrorReply(err2)
+		return redis.NewErrorCommand(err2)
 	}
 	// pop src right element, put into dest left
 	element := srcList.RemoveRight()
@@ -190,7 +189,7 @@ func execRPopLPush(db *SingleDB, command redis.Command) *protocol.Reply {
 		db.addAof(command.Parts())
 		destList.AddLeft(element)
 	}
-	return protocol.NewBulkValueReply(element)
+	return redis.NewBulkStringCommand(element)
 }
 
 func isLinkedList(entry *database.Entry) bool {
@@ -210,7 +209,7 @@ func getOrInitLinkedList(db *SingleDB, key string) (*list.LinkedList, error) {
 			linkedList = entry.Data.(*list.LinkedList)
 			return linkedList, nil
 		} else {
-			return nil, protocol.WrongTypeOperationError
+			return nil, redis.WrongTypeOperationError
 		}
 	}
 }
@@ -225,7 +224,7 @@ func getLinkedList(db *SingleDB, key string) (*list.LinkedList, error) {
 			linkedList = entry.Data.(*list.LinkedList)
 			return linkedList, nil
 		} else {
-			return nil, protocol.WrongTypeOperationError
+			return nil, redis.WrongTypeOperationError
 		}
 	}
 }

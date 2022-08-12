@@ -6,8 +6,7 @@ import (
 	"redigo/datastruct/set"
 	"redigo/datastruct/zset"
 	"redigo/interface/database"
-	"redigo/interface/redis"
-	"redigo/redis/protocol"
+	"redigo/redis"
 	"redigo/util/pattern"
 	"strconv"
 	"time"
@@ -27,13 +26,13 @@ func init() {
 	RegisterCommandExecutor("randomkey", execRandomKey, 0)
 }
 
-func execKeys(db *SingleDB, command redis.Command, keys []string) *protocol.Reply {
+func execKeys(db *SingleDB, command redis.Command, keys []string) *redis.RespCommand {
 	args := command.Args()
 	if len(args) != 1 {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("KEYS"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("KEYS"))
 	}
 	if string(args[0]) == "*" {
-		return protocol.NewStringArrayReply(keys)
+		return redis.NewStringArrayCommand(keys)
 	}
 	p := pattern.ParsePattern(string(args[0]))
 	i := 0
@@ -43,47 +42,47 @@ func execKeys(db *SingleDB, command redis.Command, keys []string) *protocol.Repl
 			i++
 		}
 	}
-	return protocol.NewStringArrayReply(keys[:i])
+	return redis.NewStringArrayCommand(keys[:i])
 }
 
-func execTTL(db *SingleDB, command redis.Command) *protocol.Reply {
+func execTTL(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("ttl"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("ttl"))
 	}
 	key := string(args[0])
 	_, exists := db.getEntry(string(args[0]))
 	if !exists {
-		return protocol.NewNumberReply(-2)
+		return redis.NewNumberCommand(-2)
 	}
 	ttl := db.TTL(key)
 	if ttl == -1 {
-		return protocol.NewNumberReply(-1)
+		return redis.NewNumberCommand(-1)
 	}
-	return protocol.NewNumberReply(int(ttl.Seconds()))
+	return redis.NewNumberCommand(int(ttl.Seconds()))
 }
 
-func execPTTL(db *SingleDB, command redis.Command) *protocol.Reply {
+func execPTTL(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("ttl"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("ttl"))
 	}
 	key := string(args[0])
 	_, exists := db.getEntry(key)
 	if !exists {
-		return protocol.NewNumberReply(-2)
+		return redis.NewNumberCommand(-2)
 	}
 	ttl := db.TTL(key)
 	if ttl == -1 {
-		return protocol.NewNumberReply(-1)
+		return redis.NewNumberCommand(-1)
 	}
-	return protocol.NewNumberReply(int(ttl.Milliseconds()))
+	return redis.NewNumberCommand(int(ttl.Milliseconds()))
 }
 
-func execDel(db *SingleDB, command redis.Command) *protocol.Reply {
+func execDel(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("del"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("del"))
 	}
 	result := 0
 	for _, arg := range args {
@@ -95,13 +94,13 @@ func execDel(db *SingleDB, command redis.Command) *protocol.Reply {
 		}
 		result += deleted
 	}
-	return protocol.NewNumberReply(result)
+	return redis.NewNumberCommand(result)
 }
 
-func execExists(db *SingleDB, command redis.Command) *protocol.Reply {
+func execExists(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("exists"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("exists"))
 	}
 	existCount := 0
 	for _, arg := range args {
@@ -111,39 +110,39 @@ func execExists(db *SingleDB, command redis.Command) *protocol.Reply {
 			existCount++
 		}
 	}
-	return protocol.NewNumberReply(existCount)
+	return redis.NewNumberCommand(existCount)
 }
 
-func execPersist(db *SingleDB, command redis.Command) *protocol.Reply {
+func execPersist(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("persist"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("persist"))
 	}
 	key := string(args[0])
 	_, exists := db.getEntry(key)
 	if !exists {
-		return protocol.NewNumberReply(0)
+		return redis.NewNumberCommand(0)
 	}
 	removed := db.CancelTTL(key)
 	if removed == 1 {
 		db.addAof(command.Parts())
 	}
-	return protocol.NewNumberReply(removed)
+	return redis.NewNumberCommand(removed)
 }
 
-func execExpire(db *SingleDB, command redis.Command) *protocol.Reply {
+func execExpire(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("persist"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("persist"))
 	}
 	key := string(args[0])
 	_, exists := db.getEntry(key)
 	if !exists {
-		return protocol.NewNumberReply(0)
+		return redis.NewNumberCommand(0)
 	}
 	// parse ttl number
 	if num, err := strconv.Atoi(string(args[1])); err != nil {
-		return protocol.NewErrorReply(protocol.HashValueNotIntegerError)
+		return redis.NewErrorCommand(redis.HashValueNotIntegerError)
 	} else {
 		if num > 0 {
 			// cancel old ttl, set new expire time
@@ -159,14 +158,14 @@ func execExpire(db *SingleDB, command redis.Command) *protocol.Reply {
 			// key already expired, add del to aof
 			db.addAof([][]byte{[]byte("del"), args[0]})
 		}
-		return protocol.NewNumberReply(1)
+		return redis.NewNumberCommand(1)
 	}
 }
 
-func execType(db *SingleDB, command redis.Command) *protocol.Reply {
+func execType(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("TYPE"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("TYPE"))
 	}
 	entry, exists := db.getEntry(string(args[0]))
 	var result string
@@ -175,17 +174,17 @@ func execType(db *SingleDB, command redis.Command) *protocol.Reply {
 	} else {
 		result = typeOf(*entry)
 	}
-	return protocol.NewSingleStringReply(result)
+	return redis.NewSingleLineCommand([]byte(result))
 }
 
-func execPExpireAt(db *SingleDB, command redis.Command) *protocol.Reply {
+func execPExpireAt(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("PEXPIREAT"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("PEXPIREAT"))
 	}
 	expireAt, err := strconv.ParseInt(string(args[1]), 10, 64)
 	if err != nil {
-		return protocol.NewErrorReply(protocol.HashValueNotIntegerError)
+		return redis.NewErrorCommand(redis.HashValueNotIntegerError)
 	}
 	_, exists := db.getEntry(string(args[0]))
 	if exists {
@@ -197,51 +196,51 @@ func execPExpireAt(db *SingleDB, command redis.Command) *protocol.Reply {
 			db.ExpireAt(string(args[0]), &expireTime)
 			db.addAof(command.Parts())
 		}
-		return protocol.NewNumberReply(1)
+		return redis.NewNumberCommand(1)
 	} else {
-		return protocol.NewNumberReply(0)
+		return redis.NewNumberCommand(0)
 	}
 }
 
-func execRename(db *SingleDB, command redis.Command) *protocol.Reply {
+func execRename(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("rename"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("rename"))
 	}
 	oldKey := string(args[0])
 	newKey := string(args[1])
 	if oldKey == newKey {
-		return protocol.OKReply
+		return redis.OKCommand
 	}
 	if err := db.Rename(oldKey, newKey); err != nil {
-		return protocol.NewErrorReply(err)
+		return redis.NewErrorCommand(err)
 	}
-	return protocol.OKReply
+	return redis.OKCommand
 }
 
-func execRenameNX(db *SingleDB, command redis.Command) *protocol.Reply {
+func execRenameNX(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("RENAMENX"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("RENAMENX"))
 	}
 	oldKey := string(args[0])
 	newKey := string(args[1])
 	if newKey == oldKey {
-		return protocol.NewNumberReply(0)
+		return redis.NewNumberCommand(0)
 	}
 	if res, err := db.RenameNX(oldKey, newKey); err != nil {
-		return protocol.NewErrorReply(err)
+		return redis.NewErrorCommand(err)
 	} else {
-		return protocol.NewNumberReply(res)
+		return redis.NewNumberCommand(res)
 	}
 }
 
-func execRandomKey(db *SingleDB, command redis.Command) *protocol.Reply {
+func execRandomKey(db *SingleDB, command redis.Command) *redis.RespCommand {
 	if db.Len(0) == 0 {
-		return protocol.NilReply
+		return redis.NilCommand
 	}
 	keys := db.randomKeys(1)
-	return protocol.NewBulkStringReply(keys[0])
+	return redis.NewBulkStringCommand([]byte(keys[0]))
 }
 
 func typeOf(entry database.Entry) string {

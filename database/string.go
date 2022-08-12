@@ -4,8 +4,7 @@ import (
 	"log"
 	"redigo/datastruct/bitmap"
 	"redigo/interface/database"
-	"redigo/interface/redis"
-	"redigo/redis/protocol"
+	"redigo/redis"
 	"strconv"
 	"time"
 )
@@ -33,10 +32,10 @@ func init() {
 	RegisterCommandExecutor("bitcount", execBitCount, 3)
 }
 
-func executeSet(db *SingleDB, command redis.Command) *protocol.Reply {
+func executeSet(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("set"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("set"))
 	}
 	key := string(args[0])
 	value := args[1]
@@ -52,11 +51,11 @@ func executeSet(db *SingleDB, command redis.Command) *protocol.Reply {
 			policy = updatePolicy
 		} else if arg == "EX" || arg == "PX" {
 			if expireTime != infiniteExpireTime || i == len(args)-1 {
-				return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("set "))
+				return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("set "))
 			}
 			if num, err := strconv.Atoi(string(args[i+1])); err != nil {
 				log.Println("Error arg: ", arg)
-				return protocol.NewErrorReply(protocol.HashValueNotIntegerError)
+				return redis.NewErrorCommand(redis.HashValueNotIntegerError)
 			} else {
 				expireTime = num
 				switch arg {
@@ -95,32 +94,32 @@ func executeSet(db *SingleDB, command redis.Command) *protocol.Reply {
 		}
 	}
 	if result == 0 {
-		return protocol.NilReply
+		return redis.NilCommand
 	} else {
 		db.addVersion(key)
-		return protocol.OKReply
+		return redis.OKCommand
 	}
 }
 
-func executeGet(db *SingleDB, command redis.Command) *protocol.Reply {
+func executeGet(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("get"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("get"))
 	}
 	result, exists, err := getString(db, string(args[0]))
 	if err != nil {
-		return protocol.NewErrorReply(err)
+		return redis.NewErrorCommand(err)
 	}
 	if exists {
-		return protocol.NewBulkValueReply(result)
+		return redis.NewBulkStringCommand(result)
 	}
-	return protocol.NilReply
+	return redis.NilCommand
 }
 
-func executeSetNX(db *SingleDB, command redis.Command) *protocol.Reply {
+func executeSetNX(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("setnx"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("setnx"))
 	}
 	key := string(args[0])
 	value := args[1]
@@ -135,13 +134,13 @@ func executeSetNX(db *SingleDB, command redis.Command) *protocol.Reply {
 			db.addAof([][]byte{[]byte("persist"), args[0]})
 		}
 	}
-	return protocol.NewNumberReply(result)
+	return redis.NewNumberCommand(result)
 }
 
-func executeAppend(db *SingleDB, command redis.Command) *protocol.Reply {
+func executeAppend(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("append"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("append"))
 	}
 	key := string(args[0])
 	appendValue := args[1]
@@ -151,7 +150,7 @@ func executeAppend(db *SingleDB, command redis.Command) *protocol.Reply {
 		entry := v.(*database.Entry)
 		// check if entry is string type
 		if !isString(*entry) {
-			return protocol.NewErrorReply(protocol.WrongTypeOperationError)
+			return redis.NewErrorCommand(redis.WrongTypeOperationError)
 		}
 		// append new value to original string
 		originalValue := entry.Data.([]byte)
@@ -168,111 +167,111 @@ func executeAppend(db *SingleDB, command redis.Command) *protocol.Reply {
 		length = len(appendValue)
 		db.addAof([][]byte{[]byte("SET"), args[0], args[1]})
 	}
-	return protocol.NewNumberReply(length)
+	return redis.NewNumberCommand(length)
 }
 
-func executeIncr(db *SingleDB, command redis.Command) *protocol.Reply {
+func executeIncr(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("incr"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("incr"))
 	}
 	key := string(args[0])
 	return add(db, key, 1)
 }
 
-func executeDecr(db *SingleDB, command redis.Command) *protocol.Reply {
+func executeDecr(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("decr"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("decr"))
 	}
 	key := string(args[0])
 	return add(db, key, -1)
 }
 
-func executeIncrby(db *SingleDB, command redis.Command) *protocol.Reply {
+func executeIncrby(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("incrby"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("incrby"))
 	}
 	key := string(args[0])
 	deltaStr := string(args[1])
 	if delta, err := strconv.Atoi(deltaStr); err != nil {
-		return protocol.NewErrorReply(protocol.HashValueNotIntegerError)
+		return redis.NewErrorCommand(redis.HashValueNotIntegerError)
 	} else {
 		return add(db, key, delta)
 	}
 }
 
-func executeDecrby(db *SingleDB, command redis.Command) *protocol.Reply {
+func executeDecrby(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("decrby"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("decrby"))
 	}
 	key := string(args[0])
 	deltaStr := string(args[1])
 	if delta, err := strconv.Atoi(deltaStr); err != nil {
-		return protocol.NewErrorReply(protocol.HashValueNotIntegerError)
+		return redis.NewErrorCommand(redis.HashValueNotIntegerError)
 	} else {
 		return add(db, key, -delta)
 	}
 }
 
 // add : add a delta value to the key's value
-func add(db *SingleDB, key string, delta int) *protocol.Reply {
+func add(db *SingleDB, key string, delta int) *redis.RespCommand {
 	v, exists := db.data.Get(key)
 	if exists {
 		entry := v.(*database.Entry)
 		// check entry type
 		if !isString(*entry) {
-			return protocol.NewErrorReply(protocol.WrongTypeOperationError)
+			return redis.NewErrorCommand(redis.WrongTypeOperationError)
 		}
 		s := string(entry.Data.([]byte))
 		if val, err := strconv.Atoi(s); err != nil {
-			return protocol.NewErrorReply(protocol.HashValueNotIntegerError)
+			return redis.NewErrorCommand(redis.HashValueNotIntegerError)
 		} else {
 			val = val + delta
 			value := []byte(strconv.Itoa(val))
 			entry.Data = value
 			db.data.Put(key, entry)
-			return protocol.NewNumberReply(val)
+			return redis.NewNumberCommand(val)
 		}
 	} else {
 		entry := &database.Entry{Data: []byte(strconv.Itoa(delta))}
 		db.data.Put(key, entry)
-		return protocol.NewNumberReply(delta)
+		return redis.NewNumberCommand(delta)
 	}
 }
 
-func execStrLen(db *SingleDB, command redis.Command) *protocol.Reply {
+func execStrLen(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("STRLEN"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("STRLEN"))
 	}
 	value, exists, err := getString(db, string(args[0]))
 	if err != nil {
-		return protocol.NewErrorReply(err)
+		return redis.NewErrorCommand(err)
 	}
 	if exists {
-		return protocol.NewNumberReply(len(value))
+		return redis.NewNumberCommand(len(value))
 	}
-	return protocol.NewNumberReply(0)
+	return redis.NewNumberCommand(0)
 }
 
-func execSetBit(db *SingleDB, command redis.Command) *protocol.Reply {
+func execSetBit(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("SETBIT"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("SETBIT"))
 	}
 	// parse offset and bit number
 	offset, err := strconv.ParseInt(string(args[1]), 10, 64)
 	bit, err := strconv.ParseInt(string(args[2]), 10, 8)
 	if err != nil {
-		return protocol.NewErrorReply(protocol.HashValueNotIntegerError)
+		return redis.NewErrorCommand(redis.HashValueNotIntegerError)
 	}
 	// get bitmap struct
 	bm, exists, err := getBitMap(db, string(args[0]))
 	if err != nil {
-		return protocol.NewErrorReply(err)
+		return redis.NewErrorCommand(err)
 	}
 	if !exists {
 		// create a new bitmap if not exist
@@ -282,48 +281,48 @@ func execSetBit(db *SingleDB, command redis.Command) *protocol.Reply {
 	}
 	original := bm.SetBit(offset, byte(bit))
 	db.addAof(command.Parts())
-	return protocol.NewNumberReply(int(original))
+	return redis.NewNumberCommand(int(original))
 }
 
-func execGetBit(db *SingleDB, command redis.Command) *protocol.Reply {
+func execGetBit(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("GETBIT"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("GETBIT"))
 	}
 	// check offset number
 	offset, err := strconv.ParseInt(string(args[1]), 10, 64)
 	if err != nil {
-		return protocol.NewErrorReply(protocol.HashValueNotIntegerError)
+		return redis.NewErrorCommand(redis.HashValueNotIntegerError)
 	}
 	// get bitmap data structure
 	bitMap, exists, err := getBitMap(db, string(args[0]))
 	if err != nil {
-		return protocol.NewErrorReply(err)
+		return redis.NewErrorCommand(err)
 	}
 	if exists {
-		return protocol.NewNumberReply(int(bitMap.GetBit(offset)))
+		return redis.NewNumberCommand(int(bitMap.GetBit(offset)))
 	}
-	return protocol.NewNumberReply(0)
+	return redis.NewNumberCommand(0)
 }
-func execBitCount(db *SingleDB, command redis.Command) *protocol.Reply {
+func execBitCount(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("BITCOUNT"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("BITCOUNT"))
 	}
 
 	start, err := strconv.Atoi(string(args[1]))
 	end, err := strconv.Atoi(string(args[2]))
 	if err != nil {
-		return protocol.NewErrorReply(protocol.ValueNotIntegerOrOutOfRangeError)
+		return redis.NewErrorCommand(redis.ValueNotIntegerOrOutOfRangeError)
 	}
 	bitMap, exists, err := getBitMap(db, string(args[0]))
 	if err != nil {
-		return protocol.NewErrorReply(err)
+		return redis.NewErrorCommand(err)
 	}
 	if !exists {
-		return protocol.NewNumberReply(0)
+		return redis.NewNumberCommand(0)
 	}
-	return protocol.NewNumberReply(int(bitMap.BitCount(int64(start), int64(end))))
+	return redis.NewNumberCommand(int(bitMap.BitCount(int64(start), int64(end))))
 }
 
 // getString get the value of this key, if not string returns an error
@@ -340,7 +339,7 @@ func getString(db *SingleDB, key string) ([]byte, bool, error) {
 		var bitMap *bitmap.BitMap = entry.Data.(*bitmap.BitMap)
 		return *bitMap, true, nil
 	}
-	return nil, true, protocol.WrongTypeOperationError
+	return nil, true, redis.WrongTypeOperationError
 }
 
 func getBitMap(db *SingleDB, key string) (*bitmap.BitMap, bool, error) {
@@ -356,7 +355,7 @@ func getBitMap(db *SingleDB, key string) (*bitmap.BitMap, bool, error) {
 		return entry.Data.(*bitmap.BitMap), true, nil
 	}
 
-	return nil, true, protocol.WrongTypeOperationError
+	return nil, true, redis.WrongTypeOperationError
 }
 
 func isString(entry database.Entry) bool {

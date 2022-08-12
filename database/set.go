@@ -4,8 +4,7 @@ import (
 	"redigo/config"
 	"redigo/datastruct/set"
 	"redigo/interface/database"
-	"redigo/interface/redis"
-	"redigo/redis/protocol"
+	"redigo/redis"
 	"reflect"
 	"strconv"
 )
@@ -25,14 +24,14 @@ func init() {
 	RegisterCommandExecutor("sunion", execSUnion, 2)
 }
 
-func execSAdd(db *SingleDB, command redis.Command) *protocol.Reply {
+func execSAdd(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("SADD"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("SADD"))
 	}
 	s, err := getOrCreateSet(db, string(args[0]))
 	if err != nil {
-		return protocol.NewErrorReply(err)
+		return redis.NewErrorCommand(err)
 	}
 	vals := args[1:]
 	count := 0
@@ -40,67 +39,67 @@ func execSAdd(db *SingleDB, command redis.Command) *protocol.Reply {
 		count += s.Add(string(val))
 	}
 	db.addAof(command.Parts())
-	return protocol.NewNumberReply(count)
+	return redis.NewNumberCommand(count)
 }
 
-func execSIsMember(db *SingleDB, command redis.Command) *protocol.Reply {
+func execSIsMember(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("SISMEMBER"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("SISMEMBER"))
 	}
 	s, err := getSet(db, string(args[0]))
 	if err != nil {
-		return protocol.NewErrorReply(err)
+		return redis.NewErrorCommand(err)
 	}
 	if s != nil {
-		return protocol.NewNumberReply(s.Has(string(args[1])))
+		return redis.NewNumberCommand(s.Has(string(args[1])))
 	}
-	return protocol.NewNumberReply(0)
+	return redis.NewNumberCommand(0)
 }
 
-func execSMembers(db *SingleDB, command redis.Command) *protocol.Reply {
+func execSMembers(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("SMEMBERS"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("SMEMBERS"))
 	}
 	s, err := getSet(db, string(args[0]))
 	if err != nil {
-		return protocol.NewErrorReply(err)
+		return redis.NewErrorCommand(err)
 	}
 	if s != nil {
-		return protocol.NewStringArrayReply(s.Members())
+		return redis.NewStringArrayCommand(s.Members())
 	}
-	return protocol.EmptyListReply
+	return redis.EmptyListCommand
 }
 
-func execSRandomMember(db *SingleDB, command redis.Command) *protocol.Reply {
+func execSRandomMember(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("SRANDMEMBER"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("SRANDMEMBER"))
 	}
 	// parse random member count
 	count, err := strconv.Atoi(string(args[1]))
 	if err != nil {
-		return protocol.NewErrorReply(protocol.HashValueNotIntegerError)
+		return redis.NewErrorCommand(redis.HashValueNotIntegerError)
 	}
 	s, err := getSet(db, string(args[0]))
 	if err != nil {
-		return protocol.NewErrorReply(err)
+		return redis.NewErrorCommand(err)
 	}
 	if s != nil {
-		return protocol.NewStringArrayReply(s.RandomMembers(count))
+		return redis.NewStringArrayCommand(s.RandomMembers(count))
 	}
-	return protocol.EmptyListReply
+	return redis.EmptyListCommand
 }
 
-func execSRem(db *SingleDB, command redis.Command) *protocol.Reply {
+func execSRem(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("LREM"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("LREM"))
 	}
 	s, err := getSet(db, string(args[0]))
 	if err != nil {
-		return protocol.NewErrorReply(err)
+		return redis.NewErrorCommand(err)
 	}
 	if s != nil {
 		values := args[1:]
@@ -109,24 +108,24 @@ func execSRem(db *SingleDB, command redis.Command) *protocol.Reply {
 			count += s.Remove(string(value))
 		}
 		db.addAof(command.Parts())
-		return protocol.NewNumberReply(count)
+		return redis.NewNumberCommand(count)
 	}
-	return protocol.NewNumberReply(0)
+	return redis.NewNumberCommand(0)
 }
 
-func execSPop(db *SingleDB, command redis.Command) *protocol.Reply {
+func execSPop(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("SPOP"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("SPOP"))
 	}
 	// parse pop count, check if is integer
 	count, err := strconv.Atoi(string(args[1]))
 	if err != nil {
-		return protocol.NewErrorReply(protocol.HashValueNotIntegerError)
+		return redis.NewErrorCommand(redis.HashValueNotIntegerError)
 	}
 	s, err := getSet(db, string(args[0]))
 	if err != nil {
-		return protocol.NewErrorReply(err)
+		return redis.NewErrorCommand(err)
 	}
 	if s != nil {
 		members := s.RandomMembersDistinct(count)
@@ -143,47 +142,47 @@ func execSPop(db *SingleDB, command redis.Command) *protocol.Reply {
 			}
 		}
 		db.addAof(aofCmdLine)
-		return protocol.NewStringArrayReply(members)
+		return redis.NewStringArrayCommand(members)
 	}
-	return protocol.EmptyListReply
+	return redis.EmptyListCommand
 }
 
-func execSDiff(db *SingleDB, command redis.Command) *protocol.Reply {
+func execSDiff(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("SDIFF"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("SDIFF"))
 	}
 	s1, err := getSet(db, string(args[0]))
 	if err != nil {
-		return protocol.NewErrorReply(err)
+		return redis.NewErrorCommand(err)
 	}
 	s2, err := getSet(db, string(args[1]))
 	if err != nil {
-		return protocol.NewErrorReply(err)
+		return redis.NewErrorCommand(err)
 	}
 
 	if s1 != nil && s2 != nil {
 		diff := s1.Diff(s2)
-		return protocol.NewStringArrayReply(diff)
+		return redis.NewStringArrayCommand(diff)
 	} else if s1 != nil {
-		return protocol.NewStringArrayReply(s1.Members())
+		return redis.NewStringArrayCommand(s1.Members())
 	} else {
-		return protocol.EmptyListReply
+		return redis.EmptyListCommand
 	}
 }
 
-func execSDiffStore(db *SingleDB, command redis.Command) *protocol.Reply {
+func execSDiffStore(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("SDIFF"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("SDIFF"))
 	}
 	s1, err := getSet(db, string(args[0]))
 	if err != nil {
-		return protocol.NewErrorReply(err)
+		return redis.NewErrorCommand(err)
 	}
 	s2, err := getSet(db, string(args[1]))
 	if err != nil {
-		return protocol.NewErrorReply(err)
+		return redis.NewErrorCommand(err)
 	}
 	// check set1 and set2 existence and data type
 	var diff []string
@@ -202,42 +201,42 @@ func execSDiffStore(db *SingleDB, command redis.Command) *protocol.Reply {
 	}
 	db.data.Put(string(args[0]), &database.Entry{Data: dest})
 	db.addAof(command.Parts())
-	return protocol.NewStringArrayReply(diff)
+	return redis.NewStringArrayCommand(diff)
 }
 
-func execSInter(db *SingleDB, command redis.Command) *protocol.Reply {
+func execSInter(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("SINTER"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("SINTER"))
 	}
 	s1, err := getSet(db, string(args[0]))
 	if err != nil {
-		return protocol.NewErrorReply(err)
+		return redis.NewErrorCommand(err)
 	}
 	s2, err := getSet(db, string(args[1]))
 	if err != nil {
-		return protocol.NewErrorReply(err)
+		return redis.NewErrorCommand(err)
 	}
 	if s1 != nil && s2 != nil {
 		inter := s1.Inter(s2)
-		return protocol.NewStringArrayReply(inter)
+		return redis.NewStringArrayCommand(inter)
 	} else {
-		return protocol.EmptyListReply
+		return redis.EmptyListCommand
 	}
 }
 
-func execSInterStore(db *SingleDB, command redis.Command) *protocol.Reply {
+func execSInterStore(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("SINTERSTORE"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("SINTERSTORE"))
 	}
 	s1, err := getSet(db, string(args[0]))
 	if err != nil {
-		return protocol.NewErrorReply(err)
+		return redis.NewErrorCommand(err)
 	}
 	s2, err := getSet(db, string(args[1]))
 	if err != nil {
-		return protocol.NewErrorReply(err)
+		return redis.NewErrorCommand(err)
 	}
 	var inter []string
 	// check set1 and set2 existence and data type
@@ -252,44 +251,44 @@ func execSInterStore(db *SingleDB, command redis.Command) *protocol.Reply {
 	}
 	db.data.Put(string(args[0]), &database.Entry{Data: dest})
 	db.addAof(command.Parts())
-	return protocol.NewStringArrayReply(inter)
+	return redis.NewStringArrayCommand(inter)
 }
 
-func execSCard(db *SingleDB, command redis.Command) *protocol.Reply {
+func execSCard(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("SCARD"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("SCARD"))
 	}
 	entry, exists := db.getEntry(string(args[0]))
 	if exists {
 		s := entry.Data.(*set.Set)
-		return protocol.NewNumberReply(s.Len())
+		return redis.NewNumberCommand(s.Len())
 	}
-	return protocol.NewNumberReply(0)
+	return redis.NewNumberCommand(0)
 }
 
-func execSUnion(db *SingleDB, command redis.Command) *protocol.Reply {
+func execSUnion(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError("SINTER"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("SINTER"))
 	}
 	s1, err := getSet(db, string(args[0]))
 	if err != nil {
-		return protocol.NewErrorReply(err)
+		return redis.NewErrorCommand(err)
 	}
 	s2, err := getSet(db, string(args[1]))
 	if err != nil {
-		return protocol.NewErrorReply(err)
+		return redis.NewErrorCommand(err)
 	}
 	if s1 != nil && s2 != nil {
 		union := s1.Union(s2)
-		return protocol.NewStringArrayReply(union)
+		return redis.NewStringArrayCommand(union)
 	} else if s1 != nil {
-		return protocol.NewStringArrayReply(s1.Members())
+		return redis.NewStringArrayCommand(s1.Members())
 	} else if s2 != nil {
-		return protocol.NewStringArrayReply(s2.Members())
+		return redis.NewStringArrayCommand(s2.Members())
 	} else {
-		return protocol.EmptyListReply
+		return redis.EmptyListCommand
 	}
 }
 
@@ -304,7 +303,7 @@ func getOrCreateSet(db *SingleDB, key string) (*set.Set, error) {
 		if isSet(*entry) {
 			return entry.Data.(*set.Set), nil
 		}
-		return nil, protocol.WrongTypeOperationError
+		return nil, redis.WrongTypeOperationError
 	}
 }
 
@@ -316,7 +315,7 @@ func getSet(db *SingleDB, key string) (*set.Set, error) {
 		if isSet(*entry) {
 			return entry.Data.(*set.Set), nil
 		} else {
-			return nil, protocol.WrongTypeOperationError
+			return nil, redis.WrongTypeOperationError
 		}
 	}
 }
