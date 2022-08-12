@@ -7,8 +7,7 @@ import (
 	"os"
 	"redigo/config"
 	"redigo/interface/database"
-	"redigo/redis/parser"
-	"redigo/redis/protocol"
+	"redigo/redis"
 	"redigo/tcp"
 	"strconv"
 	"sync"
@@ -138,7 +137,7 @@ func (h *Handler) handlePayload(p Payload) {
 	// Add select DB command if payload's database is not aof handler's current db
 	if p.idx != h.currentDB {
 		cmd := []string{"SELECT", strconv.Itoa(p.idx)}
-		raw := protocol.NewStringArrayReply(cmd)
+		raw := redis.NewStringArrayCommand(cmd)
 		_, err := h.aofFile.Write(raw.ToBytes())
 		if err != nil {
 			log.Println(err)
@@ -147,7 +146,7 @@ func (h *Handler) handlePayload(p Payload) {
 		h.currentDB = p.idx
 	}
 	// Get RESP from command line
-	raw := protocol.NewArrayReply(p.command)
+	raw := redis.NewArrayCommand(p.command)
 	_, err := h.aofFile.Write(raw.ToBytes())
 	if err != nil {
 		log.Println(err)
@@ -173,7 +172,7 @@ func (h *Handler) loadAof(maxBytes int64) error {
 	// a fake connection, to hold the database index
 	fakeConn := tcp.Connection{}
 	for {
-		cmd, err := parser.Parse(reader)
+		cmd, err := redis.Decode(reader)
 		if err != nil {
 			if err != io.EOF {
 				return err

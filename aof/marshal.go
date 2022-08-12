@@ -7,7 +7,7 @@ import (
 	"redigo/datastruct/set"
 	"redigo/datastruct/zset"
 	"redigo/interface/database"
-	"redigo/redis/protocol"
+	"redigo/redis"
 	"strconv"
 	"time"
 )
@@ -22,11 +22,11 @@ var (
 )
 
 // EntryToCommand create RESP style commands from entry holding data
-func EntryToCommand(key string, entry *database.Entry) *protocol.Reply {
+func EntryToCommand(key string, entry *database.Entry) *redis.RespCommand {
 	if entry == nil {
 		return nil
 	}
-	var command *protocol.Reply
+	var command *redis.RespCommand
 	switch entry.Data.(type) {
 	case []byte:
 		command = stringToCommand(key, entry.Data.([]byte))
@@ -46,15 +46,15 @@ func EntryToCommand(key string, entry *database.Entry) *protocol.Reply {
 	return command
 }
 
-func stringToCommand(key string, value []byte) *protocol.Reply {
+func stringToCommand(key string, value []byte) *redis.RespCommand {
 	command := make([][]byte, 3)
 	command[0] = setCmd
 	command[1] = []byte(key)
 	command[2] = value
-	return protocol.NewArrayReply(command)
+	return redis.NewArrayCommand(command)
 }
 
-func listToCommand(key string, list *list.LinkedList) *protocol.Reply {
+func listToCommand(key string, list *list.LinkedList) *redis.RespCommand {
 	command := make([][]byte, 2+list.Size())
 	command[0] = rPushCmd
 	command[1] = []byte(key)
@@ -62,10 +62,10 @@ func listToCommand(key string, list *list.LinkedList) *protocol.Reply {
 		command[2+idx] = value
 		return true
 	})
-	return protocol.NewArrayReply(command)
+	return redis.NewArrayCommand(command)
 }
 
-func hashToCommand(key string, hash dict.Dict) *protocol.Reply {
+func hashToCommand(key string, hash dict.Dict) *redis.RespCommand {
 	command := make([][]byte, 2+2*hash.Len())
 	command[0] = hsetCmd
 	command[1] = []byte(key)
@@ -77,10 +77,10 @@ func hashToCommand(key string, hash dict.Dict) *protocol.Reply {
 		i += 2
 		return true
 	})
-	return protocol.NewArrayReply(command)
+	return redis.NewArrayCommand(command)
 }
 
-func setToCommand(key string, set *set.Set) *protocol.Reply {
+func setToCommand(key string, set *set.Set) *redis.RespCommand {
 	command := make([][]byte, 2+set.Len())
 	command[0] = sAddCmd
 	command[1] = []byte(key)
@@ -90,10 +90,10 @@ func setToCommand(key string, set *set.Set) *protocol.Reply {
 		i++
 		return true
 	})
-	return protocol.NewArrayReply(command)
+	return redis.NewArrayCommand(command)
 }
 
-func zsetToCommand(key string, zs *zset.SortedSet) *protocol.Reply {
+func zsetToCommand(key string, zs *zset.SortedSet) *redis.RespCommand {
 	command := make([][]byte, 2+zs.Size()*2)
 	command[0] = zAddCmd
 	command[1] = []byte(key)
@@ -104,13 +104,13 @@ func zsetToCommand(key string, zs *zset.SortedSet) *protocol.Reply {
 		i += 2
 		return true
 	})
-	return protocol.NewArrayReply(command)
+	return redis.NewArrayCommand(command)
 }
 
-func makeExpireCommand(key string, expire *time.Time) *protocol.Reply {
+func makeExpireCommand(key string, expire *time.Time) *redis.RespCommand {
 	command := make([][]byte, 3)
 	command[0] = pExpireAtCmd
 	command[1] = []byte(key)
 	command[2] = []byte(strconv.FormatInt(expire.UnixMilli(), 10))
-	return protocol.NewArrayReply(command)
+	return redis.NewArrayCommand(command)
 }

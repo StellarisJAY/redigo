@@ -7,7 +7,7 @@ import (
 	"os"
 	"redigo/config"
 	"redigo/interface/database"
-	"redigo/redis/protocol"
+	"redigo/redis"
 	"strconv"
 	"time"
 )
@@ -31,7 +31,7 @@ func (h *Handler) makeRewriteHandler() *Handler {
 func (h *Handler) StartRewrite() error {
 	// CAS rewrite status
 	if !h.RewriteStarted.CompareAndSwap(false, true) {
-		return protocol.AppendOnlyRewriteInProgressError
+		return redis.AppendOnlyRewriteInProgressError
 	}
 	go func() {
 		start := time.Now()
@@ -75,7 +75,7 @@ func (h *Handler) doRewrite(ctx *rewriteContext) error {
 			continue
 		}
 		//rewrite select database command
-		selectCmd := protocol.NewStringArrayReply([]string{"SELECT", strconv.Itoa(i)})
+		selectCmd := redis.NewStringArrayCommand([]string{"SELECT", strconv.Itoa(i)})
 		_, err := ctx.tmpFile.Write(selectCmd.ToBytes())
 		if err != nil {
 			return err
@@ -141,7 +141,7 @@ func (h *Handler) finishRewrite(ctx *rewriteContext) error {
 		return err
 	}
 	// change temp file's database to online aof file's database before rewrite
-	selectDbCommand := protocol.NewStringArrayReply([]string{"SELECT", strconv.Itoa(ctx.currentDB)})
+	selectDbCommand := redis.NewStringArrayCommand([]string{"SELECT", strconv.Itoa(ctx.currentDB)})
 	_, _ = ctx.tmpFile.Write(selectDbCommand.ToBytes())
 	// copy the newly written commands in old aof file to new aof file
 	_, err = io.Copy(ctx.tmpFile, src)
@@ -158,7 +158,7 @@ func (h *Handler) finishRewrite(ctx *rewriteContext) error {
 	}
 	h.aofFile = aofFile
 	// reset current database in new aof file
-	selectDbCommand = protocol.NewStringArrayReply([]string{"SELECT", strconv.Itoa(h.currentDB)})
+	selectDbCommand = redis.NewStringArrayCommand([]string{"SELECT", strconv.Itoa(h.currentDB)})
 	_, _ = ctx.tmpFile.Write(selectDbCommand.ToBytes())
 	return nil
 }
