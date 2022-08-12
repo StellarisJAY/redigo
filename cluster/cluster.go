@@ -5,6 +5,7 @@ import (
 	"redigo/interface/database"
 	"redigo/interface/redis"
 	"redigo/redis/protocol"
+	"redigo/tcp"
 	"time"
 )
 
@@ -13,6 +14,7 @@ type Cluster struct {
 	peers    map[string]*PeerClient
 	selector peer.Selector
 	address  string
+	server   *tcp.Server // 集群模式的节点server，不对客户端开放，只在集群内部使用
 }
 
 func NewCluster(db database.DB, address string, peers []string) *Cluster {
@@ -21,6 +23,7 @@ func NewCluster(db database.DB, address string, peers []string) *Cluster {
 		peers:    make(map[string]*PeerClient),
 		selector: peer.NewConsistentHashSelector(),
 		address:  address,
+		server:   tcp.NewServer(address, db),
 	}
 	for _, peer := range peers {
 		c.selector.AddPeer(peer)
@@ -44,7 +47,8 @@ func (c *Cluster) Close() {
 }
 
 func (c *Cluster) ExecuteLoop() error {
-	return c.multiDB.ExecuteLoop()
+	// 集群内部服务器启动，同时触发multiDB的启动
+	return c.server.Start()
 }
 
 func (c *Cluster) Execute(command redis.Command) *protocol.Reply {
@@ -78,4 +82,9 @@ func (c *Cluster) Peers() []*PeerClient {
 		clients = append(clients, client)
 	}
 	return clients
+}
+
+func (c *Cluster) LookForKey(key string) *PeerClient {
+	addr := c.selector.SelectPeer(key)
+	return c.peers[addr]
 }

@@ -32,7 +32,7 @@ func main() {
 	db := database.NewMultiDB(config.Properties.Databases, 1024)
 	var server *tcp.Server
 	if config.Properties.EnableClusterMode {
-		peer := cluster.NewCluster(db, config.Properties.Address, config.Properties.Peers)
+		peer := cluster.NewCluster(db, config.Properties.Self, config.Properties.Peers)
 		server = tcp.NewServer(config.Properties.Address, peer)
 	} else {
 		server = tcp.NewServer(config.Properties.Address, db)
