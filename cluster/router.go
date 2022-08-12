@@ -2,11 +2,10 @@ package cluster
 
 import (
 	"log"
-	"redigo/interface/redis"
-	"redigo/redis/protocol"
+	"redigo/redis"
 )
 
-type CommandHandler func(cluster *Cluster, command redis.Command) *protocol.Reply
+type CommandHandler func(cluster *Cluster, command redis.Command) *redis.RespCommand
 type CommandRouter map[string]CommandHandler
 
 var router CommandRouter = make(map[string]CommandHandler)
@@ -77,9 +76,9 @@ func init() {
 }
 
 // normalCommandHandler 普通命令处理器
-func normalCommandHandler(cluster *Cluster, command redis.Command) *protocol.Reply {
+func normalCommandHandler(cluster *Cluster, command redis.Command) *redis.RespCommand {
 	if len(command.Args()) < 1 {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError(command.Name()))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError(command.Name()))
 	}
 	key := string(command.Args()[0])
 	// 通过选择器找到key所在的节点
@@ -91,9 +90,9 @@ func normalCommandHandler(cluster *Cluster, command redis.Command) *protocol.Rep
 	}
 	if client, ok := cluster.peers[peer]; ok {
 		// 转发命令并等待回复
-		reply := client.RelayCommand(command)
-		log.Printf("received command result from peer: %s, command: %s", peer, string(reply.ToBytes()))
-		return reply
+		response := client.RelayCommand(command)
+		log.Printf("received command result from peer: %s", peer)
+		return response
 	}
-	return protocol.NewErrorReply(protocol.ClusterPeerNotFoundError)
+	return redis.NewErrorCommand(redis.ClusterPeerNotFoundError)
 }

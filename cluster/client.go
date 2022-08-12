@@ -3,14 +3,10 @@ package cluster
 import (
 	"bufio"
 	"context"
-	"errors"
 	"log"
 	"net"
-	"redigo/interface/redis"
-	"redigo/redis/parser"
-	"redigo/redis/protocol"
+	"redigo/redis"
 	"redigo/util/pool"
-	"strconv"
 	"sync"
 	"time"
 )
@@ -23,7 +19,7 @@ type PeerClient struct {
 
 type PeerConn struct {
 	Conn    net.Conn
-	pending chan *protocol.Reply
+	pending chan *redis.RespCommand
 	sync.Mutex
 }
 
@@ -49,7 +45,7 @@ func connect(addr string) *PeerConn {
 	return &PeerConn{Conn: conn}
 }
 
-func (c *PeerConn) sendCommand(ctx context.Context, command redis.Command) *protocol.Reply {
+func (c *PeerConn) sendCommand(ctx context.Context, command redis.Command) *redis.RespCommand {
 	// 将command转换为RESP字节流
 	payload := command.ToBytes()
 	// 设置网络发送和接收的deadline
@@ -60,50 +56,29 @@ func (c *PeerConn) sendCommand(ctx context.Context, command redis.Command) *prot
 	// 发送给peer
 	_, err := c.Conn.Write(payload)
 	if err != nil {
-		return protocol.NewErrorReply(protocol.ClusterPeerUnreachableError)
+		return redis.NewErrorCommand(redis.ClusterPeerUnreachableError)
 	}
 	// 等待、读取、解析回复
 	reader := bufio.NewReader(c.Conn)
-	parsed, err := parser.Parse(reader)
+	parsed, err := redis.Decode(reader)
 	// 网络接收超时或解析发生错误
 	if err != nil {
 		log.Println("parse peer reply error: ", err)
-		return protocol.NewErrorReply(protocol.ClusterPeerUnreachableError)
+		return redis.NewErrorCommand(redis.ClusterPeerUnreachableError)
 	}
-	return commandToReply(parsed)
+	return parsed
 }
 
 // RelayCommand 转发消息到目标peer，并等待结果
-func (pc *PeerClient) RelayCommand(command redis.Command) *protocol.Reply {
+func (pc *PeerClient) RelayCommand(command redis.Command) *redis.RespCommand {
 	ctx, cancelFunc := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancelFunc()
 	// 获取一个连接，等待超时或连接失败都会返回nil
 	c := pc.connPool.Load(ctx)
 	conn := c.(*PeerConn)
 	if conn == nil {
-		return protocol.NewErrorReply(protocol.ClusterPeerUnreachableError)
+		return redis.NewErrorCommand(redis.ClusterPeerUnreachableError)
 	}
 	defer pc.connPool.Put(c)
 	return conn.sendCommand(ctx, command)
-}
-
-func commandToReply(command redis.Command) *protocol.Reply {
-	switch command.Type() {
-	case redis.CommandTypeSingleLine:
-		return protocol.NewSingleStringReply(string(command.Parts()[0]))
-	case redis.CommandTypeBulk:
-		return protocol.NewBulkValueReply(command.Parts()[0])
-	case redis.CommandTypeArray:
-		return protocol.NewArrayReply(command.Parts())
-	case redis.CommandTypeNumber:
-		number, _ := strconv.Atoi(string(command.Parts()[0]))
-		return protocol.NewNumberReply(number)
-	case redis.CommandTypeError:
-		return protocol.NewErrorReply(errors.New(string(command.Parts()[0])))
-	case redis.ReplyTypeNil:
-		return protocol.NilReply
-	case redis.ReplyEmptyList:
-		return protocol.EmptyListReply
-	}
-	return protocol.NilReply
 }

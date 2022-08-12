@@ -3,8 +3,7 @@ package cluster
 import (
 	"redigo/cluster/peer"
 	"redigo/interface/database"
-	"redigo/interface/redis"
-	"redigo/redis/protocol"
+	"redigo/redis"
 	"redigo/tcp"
 	"time"
 )
@@ -38,7 +37,7 @@ func (c *Cluster) SubmitCommand(command redis.Command) {
 	// execute command
 	reply := c.Execute(command)
 	if reply != nil {
-		command.Connection().SendReply(reply)
+		command.Connection().SendCommand(reply)
 	}
 }
 
@@ -51,7 +50,7 @@ func (c *Cluster) ExecuteLoop() error {
 	return c.server.Start()
 }
 
-func (c *Cluster) Execute(command redis.Command) *protocol.Reply {
+func (c *Cluster) Execute(command redis.Command) *redis.RespCommand {
 	// 命令来自集群节点，调用本地数据库执行
 	if command.IsFromCluster() {
 		c.multiDB.SubmitCommand(command)
@@ -60,7 +59,7 @@ func (c *Cluster) Execute(command redis.Command) *protocol.Reply {
 	if handler, ok := router[command.Name()]; ok {
 		return handler(c, command)
 	} else {
-		return protocol.NewErrorReply(protocol.CreateUnknownCommandError(command.Name()))
+		return redis.NewErrorCommand(redis.CreateUnknownCommandError(command.Name()))
 	}
 }
 

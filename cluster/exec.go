@@ -2,15 +2,14 @@ package cluster
 
 import (
 	"log"
-	"redigo/interface/redis"
-	"redigo/redis/protocol"
+	"redigo/redis"
 	"redigo/util/conn"
 )
 
 // execKeys 集群模式下执行keys命令
 // 1. 开启多个goroutine从集群节点获取keys结果
 // 2. 开启一个goroutine获取本地结果
-func execKeys(cluster *Cluster, command redis.Command) *protocol.Reply {
+func execKeys(cluster *Cluster, command redis.Command) *redis.RespCommand {
 	realConn := command.Connection()
 	// fakeConn 用于接收本地数据库的结果
 	fakeConn := conn.NewFakeConnection(realConn)
@@ -34,5 +33,5 @@ func execKeys(cluster *Cluster, command redis.Command) *protocol.Reply {
 		result[i] = <-replies
 	}
 	command.BindConnection(realConn)
-	return protocol.NewNestedArrayReply(result)
+	return redis.NewNestedArrayCommand(result)
 }
