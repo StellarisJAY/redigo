@@ -2,65 +2,64 @@ package database
 
 import (
 	"fmt"
-	"redigo/interface/redis"
-	"redigo/redis/protocol"
+	"redigo/redis"
 	"strconv"
 	"strings"
 )
 
 var forbiddenCmds = map[string]bool{"flushdb": true, "watch": true, "unwatch": true}
 
-func Watch(db *SingleDB, conn redis.Connection, keys []string) *protocol.Reply {
+func Watch(db *SingleDB, conn redis.Connection, keys []string) *redis.RespCommand {
 	for _, key := range keys {
 		version := db.getVersion(key)
 		conn.AddWatching(fmt.Sprintf("%d_%s", db.idx, key), version)
 	}
-	return protocol.OKReply
+	return redis.OKCommand
 }
 
-func UnWatch(conn redis.Connection) *protocol.Reply {
+func UnWatch(conn redis.Connection) *redis.RespCommand {
 	conn.UnWatch()
-	return protocol.OKReply
+	return redis.OKCommand
 }
 
-func StartMulti(conn redis.Connection) *protocol.Reply {
+func StartMulti(conn redis.Connection) *redis.RespCommand {
 	if conn.IsMulti() {
-		return protocol.NewErrorReply(protocol.NestedMultiCallError)
+		return redis.NewErrorCommand(redis.NestedMultiCallError)
 	}
 	conn.SetMulti(true)
-	return protocol.OKReply
+	return redis.OKCommand
 }
 
-func EnqueueCommand(conn redis.Connection, command redis.Command) *protocol.Reply {
+func EnqueueCommand(conn redis.Connection, command redis.Command) *redis.RespCommand {
 	name := command.Name()
 	cmdExecutor, ok := executors[name]
 	if name == "multi" {
-		return protocol.NewErrorReply(protocol.NestedMultiCallError)
+		return redis.NewErrorCommand(redis.NestedMultiCallError)
 	}
 	if name == "select" {
-		conn.EnqueueCommand(command)
-		return protocol.QueuedReply
+		conn.EnqueueCommand(command.(*redis.RespCommand))
+		return redis.QueuedCommand
 	}
 	if !ok {
-		return protocol.NewErrorReply(protocol.CreateUnknownCommandError(name))
+		return redis.NewErrorCommand(redis.CreateUnknownCommandError(name))
 	}
 	if _, ok = forbiddenCmds[name]; ok {
-		return protocol.NewErrorReply(protocol.CommandCannotUseInMultiError)
+		return redis.NewErrorCommand(redis.CommandCannotUseInMultiError)
 	}
 	if !cmdExecutor.validateArgCount(len(command.Args())) {
-		return protocol.NewErrorReply(protocol.CreateWrongArgumentNumberError(name))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError(name))
 	}
-	conn.EnqueueCommand(command)
-	return protocol.QueuedReply
+	conn.EnqueueCommand(command.(*redis.RespCommand))
+	return redis.QueuedCommand
 }
 
-func Exec(db *MultiDB, conn redis.Connection) *protocol.Reply {
+func Exec(db *MultiDB, conn redis.Connection) *redis.RespCommand {
 	defer conn.SetMulti(false)
 	// check the watched keys' versions
 	watching := conn.GetWatching()
 	for watch, version := range watching {
 		if isWatchingChanged(db, watch, version) {
-			return protocol.NilReply
+			return redis.NilCommand
 		}
 	}
 	commands := conn.GetQueuedCommands()
@@ -69,15 +68,15 @@ func Exec(db *MultiDB, conn redis.Connection) *protocol.Reply {
 		reply := db.executeCommand(command)
 		replies[i] = reply.ToBytes()
 	}
-	return protocol.NewNestedArrayReply(replies)
+	return redis.NewNestedArrayCommand(replies)
 }
 
-func Discard(conn redis.Connection) *protocol.Reply {
+func Discard(conn redis.Connection) *redis.RespCommand {
 	if !conn.IsMulti() {
-		return protocol.NewErrorReply(protocol.DiscardWithoutMultiError)
+		return redis.NewErrorCommand(redis.DiscardWithoutMultiError)
 	}
 	conn.SetMulti(false)
-	return protocol.OKReply
+	return redis.OKCommand
 }
 
 // check the version of the watched key. The string arg watch is dbIndex and key combined

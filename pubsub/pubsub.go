@@ -4,8 +4,7 @@ import (
 	"container/list"
 	"redigo/datastruct/dict"
 	"redigo/datastruct/lock"
-	"redigo/interface/redis"
-	"redigo/redis/protocol"
+	"redigo/redis"
 	"redigo/util/pattern"
 	"strconv"
 )
@@ -22,19 +21,19 @@ func MakeHub() *Hub {
 	}
 }
 
-func makePublishMessage(channel string, message []byte) *protocol.Reply {
-	return protocol.NewNestedArrayReply([][]byte{
+func makePublishMessage(channel string, message []byte) *redis.RespCommand {
+	return redis.NewNestedArrayCommand([][]byte{
 		[]byte("$7\r\nmessage\r\n"),
-		[]byte("$" + strconv.Itoa(len(channel)) + protocol.CRLF + channel + protocol.CRLF),
-		[]byte("$" + strconv.Itoa(len(message)) + protocol.CRLF + string(message) + protocol.CRLF),
+		[]byte("$" + strconv.Itoa(len(channel)) + redis.CRLF + channel + redis.CRLF),
+		[]byte("$" + strconv.Itoa(len(message)) + redis.CRLF + string(message) + redis.CRLF),
 	})
 }
 
-func makeSubscribeReply(channel string, seq int) *protocol.Reply {
-	return protocol.NewNestedArrayReply([][]byte{
+func makeSubscribeCommand(channel string, seq int) *redis.RespCommand {
+	return redis.NewNestedArrayCommand([][]byte{
 		[]byte("$9\r\nsubscribe\r\n"),
-		[]byte("$" + strconv.Itoa(len(channel)) + protocol.CRLF + channel + protocol.CRLF),
-		[]byte(":" + strconv.Itoa(seq) + protocol.CRLF),
+		[]byte("$" + strconv.Itoa(len(channel)) + redis.CRLF + channel + redis.CRLF),
+		[]byte(":" + strconv.Itoa(seq) + redis.CRLF),
 	})
 }
 
@@ -52,7 +51,7 @@ func (h *Hub) Subscribe(conn redis.Connection, args [][]byte) {
 		}
 		subscribers.PushFront(conn)
 		h.locks.Unlock(sub)
-		conn.SendReply(makeSubscribeReply(sub, i+1))
+		conn.SendCommand(makeSubscribeCommand(sub, i+1))
 	}
 }
 
@@ -69,7 +68,7 @@ func (h *Hub) PSubscribe(conn redis.Connection, patterns []string) {
 			if p.Matches(key) {
 				subscribers := value.(*list.List)
 				subscribers.PushFront(conn)
-				conn.SendReply(makeSubscribeReply(key, count))
+				conn.SendCommand(makeSubscribeCommand(key, count))
 				count++
 				break
 			}
@@ -96,7 +95,7 @@ func (h *Hub) Publish(pubChannel string, message []byte) int {
 			conn := back.Value.(redis.Connection)
 			// send message if connection is still active
 			if conn.Active() {
-				conn.SendReply(msg)
+				conn.SendCommand(msg)
 				subscribers.MoveToFront(back)
 				sent++
 			} else {
