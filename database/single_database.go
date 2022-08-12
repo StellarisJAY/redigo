@@ -9,7 +9,6 @@ import (
 	"redigo/interface/database"
 	"redigo/rdb"
 	"redigo/redis"
-	"redigo/redis/protocol"
 	"redigo/util/timewheel"
 	"time"
 )
@@ -232,7 +231,7 @@ func (db *SingleDB) flushDB(async bool) {
 func (db *SingleDB) Rename(old, key string) error {
 	entry, exists := db.getEntry(old)
 	if !exists {
-		return protocol.NoSuchKeyError
+		return redis.NoSuchKeyError
 	}
 	// remove old key, put new key
 	db.data.Remove(old)
@@ -243,7 +242,7 @@ func (db *SingleDB) Rename(old, key string) error {
 func (db *SingleDB) RenameNX(oldKey, newKey string) (int, error) {
 	entry, exists := db.getEntry(oldKey)
 	if !exists {
-		return 0, protocol.NoSuchKeyError
+		return 0, redis.NoSuchKeyError
 	}
 	_, exists = db.getEntry(newKey)
 	if exists {

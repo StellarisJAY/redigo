@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"errors"
 	"io"
-	"redigo/interface/redis"
 	"strconv"
 	"strings"
 )
@@ -24,17 +23,17 @@ func Decode(reader *bufio.Reader) (*RespCommand, error) {
 		msg = msg[1:]
 	}
 	switch msg[0] {
-	case redis.SingleLinePrefix:
+	case SingleLinePrefix:
 		command = NewSingleLineCommand(msg[1 : len(msg)-2])
-	case redis.NumberPrefix:
+	case NumberPrefix:
 		number, err := strconv.Atoi(string(msg[1 : len(msg)-2]))
 		if err != nil {
 			return nil, HashValueNotIntegerError
 		}
 		command = NewNumberCommand(number)
-	case redis.ErrorPrefix:
+	case ErrorPrefix:
 		command = NewErrorCommand(errors.New(string(msg[1 : len(msg)-2])))
-	case redis.BulkPrefix:
+	case BulkPrefix:
 		bulk, err := readBulkString(reader, msg)
 		if err != nil {
 			return nil, err
@@ -46,7 +45,7 @@ func Decode(reader *bufio.Reader) (*RespCommand, error) {
 		}
 		command.SetFromCluster(fromCluster)
 		return command, nil
-	case redis.ArrayPrefix:
+	case ArrayPrefix:
 		// get Array size
 		size, err := strconv.Atoi(string(msg[1 : len(msg)-2]))
 		if err != nil {

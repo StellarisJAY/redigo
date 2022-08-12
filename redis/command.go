@@ -1,7 +1,6 @@
 package redis
 
 import (
-	"redigo/interface/redis"
 	"strconv"
 	"strings"
 )
@@ -62,36 +61,36 @@ func NewEmptyCommand() *RespCommand {
 }
 
 func NewCommand(parts [][]byte) *RespCommand {
-	return &RespCommand{parts: parts, commandType: redis.CommandTypeArray}
+	return &RespCommand{parts: parts, commandType: CommandTypeArray}
 }
 
 func NewBulkStringCommand(bulk []byte) *RespCommand {
-	return &RespCommand{parts: [][]byte{bulk}, commandType: redis.CommandTypeBulk}
+	return &RespCommand{parts: [][]byte{bulk}, commandType: CommandTypeBulk}
 }
 
 func NewNumberCommand(number int) *RespCommand {
 	return &RespCommand{
 		number:      number,
-		commandType: redis.CommandTypeNumber,
+		commandType: CommandTypeNumber,
 	}
 }
 
 func NewSingleLineCommand(message []byte) *RespCommand {
 	return &RespCommand{
 		parts:       [][]byte{message},
-		commandType: redis.CommandTypeSingleLine,
+		commandType: CommandTypeSingleLine,
 	}
 }
 
 func NewNilCommand() *RespCommand {
 	return &RespCommand{
-		commandType: redis.ReplyTypeNil,
+		commandType: ReplyTypeNil,
 	}
 }
 
 func NewEmptyListCommand() *RespCommand {
 	return &RespCommand{
-		commandType: redis.ReplyEmptyList,
+		commandType: ReplyEmptyList,
 	}
 }
 
