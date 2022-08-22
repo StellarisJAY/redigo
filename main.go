@@ -16,7 +16,8 @@ ___  __ \__________  /__(_)_  ____/_  __ \
 __  /_/ /  _ \  __  /__  /_  / __ _  / / /
 _  _, _//  __/ /_/ / _  / / /_/ / / /_/ / 
 /_/ |_| \___/\__,_/  /_/  \____/  \____/
-                             v1.0-SNAPSHOT`
+                                   
+                                    v1.0.0`
 
 func init() {
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
@@ -30,15 +31,21 @@ func main() {
 		config.LoadConfigs("./redis.yaml")
 	}
 	db := database.NewMultiDB(config.Properties.Databases, 1024)
-	var server *tcp.Server
+
 	if config.Properties.EnableClusterMode {
+		log.Println("starting Redigo server in cluster mode...")
 		peer := cluster.NewCluster(db, config.Properties.Self, config.Properties.Peers)
-		server = tcp.NewServer(config.Properties.Address, peer)
+		server := tcp.NewServer(config.Properties.Address, peer)
+		err := server.Start()
+		if err != nil {
+			panic(err)
+		}
 	} else {
-		server = tcp.NewServer(config.Properties.Address, db)
-	}
-	err := server.Start()
-	if err != nil {
-		panic(err)
+		log.Println("starting Redigo server in standalone mode...")
+		server := tcp.NewServer(config.Properties.Address, db)
+		err := server.Start()
+		if err != nil {
+			panic(err)
+		}
 	}
 }

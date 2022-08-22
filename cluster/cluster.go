@@ -13,7 +13,7 @@ type Cluster struct {
 	peers    map[string]*PeerClient
 	selector peer.Selector
 	address  string
-	server   *tcp.Server // 集群模式的节点server，不对客户端开放，只在集群内部使用
+	server   tcp.Server // 集群模式的节点server，不对客户端开放，只在集群内部使用
 }
 
 func NewCluster(db database.DB, address string, peers []string) *Cluster {

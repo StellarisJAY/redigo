@@ -1,3 +1,6 @@
+//go:build !linux
+// +build !linux
+
 package tcp
 
 import (
@@ -12,31 +15,29 @@ import (
 	"syscall"
 )
 
-type Handler interface {
-	Handle(string) error
+type Server interface {
+	Start() error
 }
 
-type Server struct {
-	address        string
-	activeConns    sync.Map
-	commandHandler *Handler
-	listener       net.Listener
-	closeChan      chan struct{}
-	db             database.DB
+type GoNetServer struct {
+	address     string
+	activeConns sync.Map
+	listener    net.Listener
+	closeChan   chan struct{}
+	db          database.DB
 }
 
-func NewServer(address string, db database.DB) *Server {
-	return &Server{
-		address:        address,
-		activeConns:    sync.Map{},
-		commandHandler: nil,
-		listener:       nil,
-		closeChan:      make(chan struct{}),
-		db:             db,
+func NewServer(address string, db database.DB) *GoNetServer {
+	return &GoNetServer{
+		address:     address,
+		activeConns: sync.Map{},
+		listener:    nil,
+		closeChan:   make(chan struct{}),
+		db:          db,
 	}
 }
 
-func (s *Server) Start() error {
+func (s *GoNetServer) Start() error {
 	listener, err := net.Listen("tcp", s.address)
 	if err != nil {
 		return err
@@ -76,7 +77,7 @@ func (s *Server) Start() error {
 		_ = http.ListenAndServe(":8899", nil)
 	}()
 
-	log.Println("Redigo Server Started, listen:", listener.Addr())
+	log.Println("Redigo GoNetServer Started, listen:", listener.Addr())
 	// run acceptor
 	err = s.acceptLoop()
 	if err != nil {
@@ -87,10 +88,10 @@ func (s *Server) Start() error {
 }
 
 /*
-	TCP Server acceptor
+	TCP GoNetServer acceptor
 	Accept conns in a loop, make connections and create read/write loop for each connection
 */
-func (s *Server) acceptLoop() error {
+func (s *GoNetServer) acceptLoop() error {
 	for {
 		conn, err := s.listener.Accept()
 		if err != nil {
