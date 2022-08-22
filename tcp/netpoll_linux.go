@@ -10,6 +10,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"redigo/datastruct/list"
 	"redigo/redis"
 	"strconv"
 	"strings"
@@ -18,7 +19,9 @@ import (
 )
 
 const (
-	EpollRead = syscall.EPOLLIN | syscall.EPOLLPRI | syscall.EPOLLERR | syscall.EPOLLHUP | unix.EPOLLET | syscall.EPOLLRDHUP
+	EpollRead     = syscall.EPOLLIN | syscall.EPOLLPRI | syscall.EPOLLERR | syscall.EPOLLHUP | unix.EPOLLET | syscall.EPOLLRDHUP
+	EpollClose    = syscall.EPOLLIN | syscall.EPOLLHUP
+	EpollWritable = syscall.EPOLLOUT
 )
 
 type EpollManager struct {
@@ -26,6 +29,7 @@ type EpollManager struct {
 	sockFd      int
 	epollFd     int
 	onReadEvent func(conn *EpollConnection) error
+	waitMsec    int
 }
 
 type EpollConnection struct {
@@ -35,10 +39,23 @@ type EpollConnection struct {
 	watching     map[string]int64
 	cmdQueue     []*redis.RespCommand
 	epollManager *EpollManager
+	replyQueue   *list.LinkedList
 }
 
 func NewEpoll() *EpollManager {
 	return &EpollManager{conns: &sync.Map{}}
+}
+
+func NewEpollConnection(fd int, epollManager *EpollManager) *EpollConnection {
+	return &EpollConnection{
+		fd:           fd,
+		selectedDB:   0,
+		multi:        false,
+		watching:     make(map[string]int64),
+		cmdQueue:     make([]*redis.RespCommand, 0),
+		epollManager: epollManager,
+		replyQueue:   list.NewLinkedList(),
+	}
 }
 
 func (e *EpollManager) Listen(address string) error {
@@ -78,17 +95,16 @@ func (e *EpollManager) Listen(address string) error {
 }
 
 func (e *EpollManager) accept() error {
-	nfd, addr, err := syscall.Accept(e.sockFd)
+	nfd, _, err := syscall.Accept(e.sockFd)
 	if err != nil {
 		return err
 	}
 	if err = syscall.SetNonblock(nfd, true); err != nil {
 		return err
 	}
-	e.conns.Store(nfd, &EpollConnection{fd: nfd})
-	log.Printf("accepted connection, fd: %d,  addr: %s, ", nfd, addr)
+	e.conns.Store(nfd, NewEpollConnection(nfd, e))
 	err = syscall.EpollCtl(e.epollFd, syscall.EPOLL_CTL_ADD, nfd, &syscall.EpollEvent{
-		Events: EpollRead,
+		Events: EpollRead | EpollWritable,
 		Fd:     int32(nfd),
 	})
 	if err != nil {
@@ -110,7 +126,7 @@ func (e *EpollManager) CloseConn(conn *EpollConnection) error {
 func (e *EpollManager) Handle() error {
 	for {
 		events := make([]syscall.EpollEvent, 1024)
-		n, err := syscall.EpollWait(e.epollFd, events, -1)
+		n, err := syscall.EpollWait(e.epollFd, events, e.waitMsec)
 		if err != nil {
 			if err.Error() == "interrupted system call" {
 				log.Println("interrupted system call")
@@ -118,31 +134,50 @@ func (e *EpollManager) Handle() error {
 			}
 			return fmt.Errorf("epoll wait error: %v", err)
 		}
+		if n <= 0 {
+			e.waitMsec = -1
+			continue
+		}
+		e.waitMsec = 0
 		for i := 0; i < n; i++ {
+			// 通过fd查询到一个连接对象
 			v, ok := e.conns.Load(int(events[i].Fd))
 			if !ok {
 				log.Println("unknown connection fd: ", events[i].Fd)
 				continue
 			}
 			conn := v.(*EpollConnection)
-			if events[i].Events&syscall.EPOLLHUP == syscall.EPOLLHUP || events[i].Events&syscall.EPOLLERR == syscall.EPOLLERR {
-				log.Println("close event for fd: ", events[i].Fd)
+			// epoll关闭事件
+			if events[i].Events == uint32(EpollClose) {
 				if err := e.CloseConn(conn); err != nil {
 					return fmt.Errorf("close conn error: %v", err)
 				}
 			} else if events[i].Events&syscall.EPOLLIN == syscall.EPOLLIN {
-				//log.Println("read event: ", events[i].Fd)
 				err := e.onReadEvent(conn)
 				if err != nil {
-					if errors.Is(err, io.EOF) {
-						continue
-					} else {
-						return fmt.Errorf("read error: %v", err)
+					if !errors.Is(err, io.EOF) {
+						log.Println("read error: ", err)
+					}
+					_ = e.CloseConn(conn)
+				}
+			}
+			if events[i].Events&EpollWritable == EpollWritable {
+				for conn.replyQueue.Size() > 0 {
+					payload := conn.replyQueue.RemoveLeft()
+					_, err := conn.Write(payload)
+					if err != nil {
+						log.Println("write error: ", err)
+						_ = e.CloseConn(conn)
+						break
 					}
 				}
 			}
 		}
 	}
+}
+
+func (e *EpollManager) Close() {
+
 }
 
 func (c *EpollConnection) Read(payload []byte) (int, error) {
@@ -167,7 +202,8 @@ func (c *EpollConnection) Close() {
 
 func (c *EpollConnection) SendCommand(command *redis.RespCommand) {
 	payload := redis.Encode(command)
-	_, _ = c.Write(payload)
+	c.replyQueue.AddRight(payload)
+	//_, _ = c.Write(payload)
 }
 
 func (c *EpollConnection) SelectDB(index int) {
@@ -179,11 +215,11 @@ func (c *EpollConnection) DBIndex() int {
 }
 
 func (c *EpollConnection) SetMulti(b bool) {
-	panic("operation not available")
+	c.multi = b
 }
 
 func (c *EpollConnection) IsMulti() bool {
-	panic("operation not available")
+	return c.multi
 }
 
 func (c *EpollConnection) EnqueueCommand(command *redis.RespCommand) {

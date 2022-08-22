@@ -21,16 +21,17 @@ type EpollServer struct {
 }
 
 func NewServer(address string, db database.DB) *EpollServer {
-	return &EpollServer{
+	s := &EpollServer{
 		address:   address,
 		closeChan: make(chan struct{}),
 		db:        db,
 	}
+	return s
 }
 
 func (es *EpollServer) Start() error {
 	es.em = NewEpoll()
-
+	es.em.onReadEvent = es.onReadEvent
 	err := es.em.Listen(es.address)
 	if err != nil {
 		return err
@@ -52,9 +53,12 @@ func (es *EpollServer) Start() error {
 	}()
 
 	go func() {
-		err := es.em.accept()
-		if err != nil {
-			log.Println("accept error: ", err)
+		for {
+			err := es.em.accept()
+			if err != nil {
+				log.Println("accept error: ", err)
+				close(es.closeChan)
+			}
 		}
 	}()
 
@@ -73,10 +77,13 @@ func (es *EpollServer) Start() error {
 		switch sig {
 		case syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT:
 			// send close signal
-			es.closeChan <- struct{}{}
+			close(es.closeChan)
 		}
 	}()
+	select {
+	case <-es.closeChan:
 
+	}
 	return nil
 }
 
@@ -86,6 +93,10 @@ func (es *EpollServer) onReadEvent(conn *EpollConnection) error {
 	if err != nil {
 		return err
 	}
-	es.db.SubmitCommand(command)
+	command.BindConnection(conn)
+	reply := es.db.Execute(command)
+	if reply != nil {
+		conn.SendCommand(reply)
+	}
 	return nil
 }
