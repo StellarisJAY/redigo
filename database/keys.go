@@ -51,7 +51,7 @@ func execTTL(db *SingleDB, command redis.Command) *redis.RespCommand {
 		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("ttl"))
 	}
 	key := string(args[0])
-	_, exists := db.getEntry(string(args[0]))
+	_, exists := db.GetEntry(string(args[0]))
 	if !exists {
 		return redis.NewNumberCommand(-2)
 	}
@@ -68,7 +68,7 @@ func execPTTL(db *SingleDB, command redis.Command) *redis.RespCommand {
 		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("ttl"))
 	}
 	key := string(args[0])
-	_, exists := db.getEntry(key)
+	_, exists := db.GetEntry(key)
 	if !exists {
 		return redis.NewNumberCommand(-2)
 	}
@@ -119,7 +119,7 @@ func execPersist(db *SingleDB, command redis.Command) *redis.RespCommand {
 		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("persist"))
 	}
 	key := string(args[0])
-	_, exists := db.getEntry(key)
+	_, exists := db.GetEntry(key)
 	if !exists {
 		return redis.NewNumberCommand(0)
 	}
@@ -136,7 +136,7 @@ func execExpire(db *SingleDB, command redis.Command) *redis.RespCommand {
 		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("persist"))
 	}
 	key := string(args[0])
-	_, exists := db.getEntry(key)
+	_, exists := db.GetEntry(key)
 	if !exists {
 		return redis.NewNumberCommand(0)
 	}
@@ -167,7 +167,7 @@ func execType(db *SingleDB, command redis.Command) *redis.RespCommand {
 	if !ValidateArgCount(command.Name(), len(args)) {
 		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("TYPE"))
 	}
-	entry, exists := db.getEntry(string(args[0]))
+	entry, exists := db.GetEntry(string(args[0]))
 	var result string
 	if !exists {
 		result = "none"
@@ -186,7 +186,7 @@ func execPExpireAt(db *SingleDB, command redis.Command) *redis.RespCommand {
 	if err != nil {
 		return redis.NewErrorCommand(redis.HashValueNotIntegerError)
 	}
-	_, exists := db.getEntry(string(args[0]))
+	_, exists := db.GetEntry(string(args[0]))
 	if exists {
 		expireTime := time.UnixMilli(expireAt)
 		if expireTime.Before(time.Now()) {

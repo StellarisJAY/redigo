@@ -259,7 +259,7 @@ func execSCard(db *SingleDB, command redis.Command) *redis.RespCommand {
 	if !ValidateArgCount(command.Name(), len(args)) {
 		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("SCARD"))
 	}
-	entry, exists := db.getEntry(string(args[0]))
+	entry, exists := db.GetEntry(string(args[0]))
 	if exists {
 		s := entry.Data.(*set.Set)
 		return redis.NewNumberCommand(s.Len())
@@ -293,7 +293,7 @@ func execSUnion(db *SingleDB, command redis.Command) *redis.RespCommand {
 }
 
 func getOrCreateSet(db *SingleDB, key string) (*set.Set, error) {
-	entry, exists := db.getEntry(key)
+	entry, exists := db.GetEntry(key)
 	if !exists {
 		s := set.NewSet()
 		entry = &database.Entry{Data: s}
@@ -308,7 +308,7 @@ func getOrCreateSet(db *SingleDB, key string) (*set.Set, error) {
 }
 
 func getSet(db *SingleDB, key string) (*set.Set, error) {
-	entry, exists := db.getEntry(key)
+	entry, exists := db.GetEntry(key)
 	if !exists {
 		return nil, nil
 	} else {

@@ -197,7 +197,7 @@ func isLinkedList(entry *database.Entry) bool {
 }
 
 func getOrInitLinkedList(db *SingleDB, key string) (*list.LinkedList, error) {
-	entry, exists := db.getEntry(key)
+	entry, exists := db.GetEntry(key)
 	var linkedList *list.LinkedList
 	if !exists {
 		linkedList = list.NewLinkedList()
@@ -215,7 +215,7 @@ func getOrInitLinkedList(db *SingleDB, key string) (*list.LinkedList, error) {
 }
 
 func getLinkedList(db *SingleDB, key string) (*list.LinkedList, error) {
-	entry, exists := db.getEntry(key)
+	entry, exists := db.GetEntry(key)
 	var linkedList *list.LinkedList
 	if !exists {
 		return nil, nil

@@ -87,3 +87,13 @@ func (c *Cluster) LookForKey(key string) *PeerClient {
 	addr := c.selector.SelectPeer(key)
 	return c.peers[addr]
 }
+
+func (c *Cluster) GetEntry(key string, dbIndex ...int) (*database.Entry, bool) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (c *Cluster) DeleteEntry(key string, dbIndex ...int) (*database.Entry, bool) {
+	//TODO implement me
+	panic("implement me")
+}

@@ -155,6 +155,20 @@ func (m *MultiDB) OnConnectionClosed(conn redis.Connection) {
 	m.hub.UnSubscribeAll(conn)
 }
 
+func (m *MultiDB) GetEntry(key string, dbIndex ...int) (*database.Entry, bool) {
+	if dbIndex == nil || len(dbIndex) == 0 {
+		return nil, false
+	}
+	return m.dbSet[dbIndex[0]].GetEntry(key)
+}
+
+func (m *MultiDB) DeleteEntry(key string, dbIndex ...int) (*database.Entry, bool) {
+	if dbIndex == nil || len(dbIndex) == 0 {
+		return nil, false
+	}
+	return m.dbSet[dbIndex[0]].DeleteEntry(key)
+}
+
 func (m *MultiDB) executeCommand(command redis.Command) *redis.RespCommand {
 	cmdName := command.Name()
 	if exec, ok := m.executors[cmdName]; ok {

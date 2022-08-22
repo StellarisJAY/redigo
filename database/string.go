@@ -327,7 +327,7 @@ func execBitCount(db *SingleDB, command redis.Command) *redis.RespCommand {
 
 // getString get the value of this key, if not string returns an error
 func getString(db *SingleDB, key string) ([]byte, bool, error) {
-	entry, exists := db.getEntry(key)
+	entry, exists := db.GetEntry(key)
 	// check key's existence
 	if !exists {
 		return nil, false, nil
@@ -343,7 +343,7 @@ func getString(db *SingleDB, key string) ([]byte, bool, error) {
 }
 
 func getBitMap(db *SingleDB, key string) (*bitmap.BitMap, bool, error) {
-	entry, exists := db.getEntry(key)
+	entry, exists := db.GetEntry(key)
 	if !exists {
 		return nil, false, nil
 	}

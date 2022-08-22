@@ -289,7 +289,7 @@ func isHash(entry *database.Entry) bool {
 }
 
 func getOrInitHash(db *SingleDB, key string) (dict.Dict, error) {
-	entry, exists := db.getEntry(key)
+	entry, exists := db.GetEntry(key)
 	if exists {
 		if !isHash(entry) {
 			return nil, redis.WrongTypeOperationError
@@ -303,7 +303,7 @@ func getOrInitHash(db *SingleDB, key string) (dict.Dict, error) {
 }
 
 func getHash(db *SingleDB, key string) (dict.Dict, bool, error) {
-	entry, exists := db.getEntry(key)
+	entry, exists := db.GetEntry(key)
 	if exists {
 		if !isHash(entry) {
 			return nil, false, redis.WrongTypeOperationError

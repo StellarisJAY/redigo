@@ -185,8 +185,8 @@ func (db *SingleDB) expireIfNeeded(key string) bool {
 	return false
 }
 
-// get the data entry holding the key's value. Checking key's existence and expire time
-func (db *SingleDB) getEntry(key string) (*database.Entry, bool) {
+// GetEntry get the data entry holding the key's value. Checking key's existence and expire time
+func (db *SingleDB) GetEntry(key string, dbIndex ...int) (*database.Entry, bool) {
 	v, ok := db.data.Get(key)
 	if !ok || db.expireIfNeeded(key) {
 		return nil, false
@@ -195,6 +195,18 @@ func (db *SingleDB) getEntry(key string) (*database.Entry, bool) {
 	// get触发将数据移动到LRU队列尾部
 	db.lruMoveEntryToTail(entry)
 	return entry, true
+}
+
+// DeleteEntry removes a key from single db and remove all the associate data like ttl and lru
+func (db *SingleDB) DeleteEntry(key string, dbIndex ...int) (*database.Entry, bool) {
+	if entry, ok := db.GetEntry(key); !ok {
+		return nil, false
+	} else {
+		db.data.Remove(key)
+		db.ttlMap.Remove(key)
+		db.lruRemoveEntry(entry)
+		return entry, true
+	}
 }
 
 func (db *SingleDB) addVersion(key string) {
@@ -229,7 +241,7 @@ func (db *SingleDB) flushDB(async bool) {
 
 // Rename key, returns error if key doesn't exist
 func (db *SingleDB) Rename(old, key string) error {
-	entry, exists := db.getEntry(old)
+	entry, exists := db.GetEntry(old)
 	if !exists {
 		return redis.NoSuchKeyError
 	}
@@ -240,11 +252,11 @@ func (db *SingleDB) Rename(old, key string) error {
 }
 
 func (db *SingleDB) RenameNX(oldKey, newKey string) (int, error) {
-	entry, exists := db.getEntry(oldKey)
+	entry, exists := db.GetEntry(oldKey)
 	if !exists {
 		return 0, redis.NoSuchKeyError
 	}
-	_, exists = db.getEntry(newKey)
+	_, exists = db.GetEntry(newKey)
 	if exists {
 		return 0, nil
 	}
@@ -265,7 +277,7 @@ func (db *SingleDB) randomKeys(samples int) []string {
 }
 
 func (db *SingleDB) Dump(key string) ([]byte, error) {
-	entry, exists := db.getEntry(key)
+	entry, exists := db.GetEntry(key)
 	if !exists {
 		return nil, nil
 	}
