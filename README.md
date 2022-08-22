@@ -78,9 +78,9 @@ useScheduleExpire true
 
 ## 性能测试
 
-测试环境（腾讯云轻量级服务器 4核4G）：
+测试环境（腾讯云轻量级服务器 2核4G）：
 
-CPU：AMD EPYC 7K62 2.6GHz
+CPU：Intel(R) Xeon(R) Platinum 8255C CPU @ 2.50GHz
 
 内存：4GB
 
@@ -88,37 +88,77 @@ CPU：AMD EPYC 7K62 2.6GHz
 
 ### 测试结果：
 
-RediGO:
+原版Redis（get，set详细报告）
 
 ```
-:~$ redis-benchmark -n 500000 -r 500000 -q -t set,get,lpush,lpop,rpush,rpop,lrange_100,lrange_300,hset,sadd,zadd -p 6380
-SET: 113096.59 requests per second
-GET: 112714.16 requests per second
-LPUSH: 116441.54 requests per second
-RPUSH: 117952.35 requests per second
-LPOP: 117398.45 requests per second
-RPOP: 119360.23 requests per second
-SADD: 110913.93 requests per second
-HSET: 108601.21 requests per second
-LPUSH (needed to benchmark LRANGE): 113481.61 requests per second
-LRANGE_100 (first 100 elements): 49603.18 requests per second
-LRANGE_300 (first 300 elements): 19219.68 requests per second
+====== SET ======                                                   
+  500000 requests completed in 9.06 seconds // 共50w次请求
+  500 parallel clients                      // 共500个客户端
+  3 bytes payload
+  keep alive: 1
+ throughput summary: 55187.64 requests per second // 吞吐量：5.5W/s
+  latency summary (msec):
+          avg       min       p50       p95       p99       max
+        4.594     1.232     4.423     5.391     8.327    18.575
+ 
+ ====== GET ======                                                   
+  500000 requests completed in 9.10 seconds  
+  500 parallel clients                       
+  3 bytes payload
+  keep alive: 1
+  throughput summary: 54957.14 requests per second // 吞吐量：5.5W/s
+  latency summary (msec):
+          avg       min       p50       p95       p99       max
+        4.588     1.272     4.471     5.543     6.103    15.471
+```
+
+Redigo（get，set详细报告）
+
+```
+====== SET ======                                                    
+  500000 requests completed in 10.07 seconds // 共50w次请求
+  500 parallel clients                       // 共500个客户端
+  3 bytes payload
+  keep alive: 1
+  throughput summary: 49667.23 requests per second // 吞吐量：4.97W/s
+  latency summary (msec):
+          avg       min       p50       p95       p99       max
+        7.440     0.640     6.247    14.279    20.671    98.815
+====== GET ======                                                    
+  500000 requests completed in 9.41 seconds // 共50w次请求
+  500 parallel clients                      // 共500个客户端
+  3 bytes payload
+  keep alive: 1
+  throughput summary: 53123.67 requests per second // 吞吐量：5.3W/s
+  latency summary (msec):
+          avg       min       p50       p95       p99       max
+        6.859     0.328     5.719    13.447    19.343    96.767
 
 ```
 
-原版Redis：
+原版Redis测试结果汇总：
 
 ```
-:~$ redis-benchmark -n 500000 -r 500000 -q -t set,get,lpush,lpop,rpush,rpop,lrange_100,lrange_300,hset,sadd,zadd -p 6379
-SET: 158478.61 requests per second
-GET: 159846.55 requests per second
-LPUSH: 162495.94 requests per second
-RPUSH: 159134.31 requests per second
-LPOP: 154655.11 requests per second
-RPOP: 156250.00 requests per second
-SADD: 157977.89 requests per second
-HSET: 156445.55 requests per second
-LPUSH (needed to benchmark LRANGE): 150015.00 requests per second
-LRANGE_100 (first 100 elements): 76651.85 requests per second
-LRANGE_300 (first 300 elements): 25897.34 requests per second
+ubuntu@VM-0-10-ubuntu:~$ redis-benchmark -n 500000 -c 500 -t set,get,lpush,lpop,sadd,zadd,hset -p 6379 -q
+SET: 55747.57 requests per second, p50=4.447 msec                   
+GET: 52334.10 requests per second, p50=4.759 msec                   
+LPUSH: 55791.12 requests per second, p50=4.407 msec                   
+LPOP: 58031.57 requests per second, p50=4.271 msec                   
+SADD: 57756.73 requests per second, p50=4.279 msec                   
+HSET: 56135.62 requests per second, p50=4.415 msec                   
+ZADD: 56053.81 requests per second, p50=4.367 msec
 ```
+
+Redigo测试结果汇总：
+
+```
+ubuntu@VM-0-10-ubuntu:~$ redis-benchmark -n 500000 -c 500 -t set,get,lpush,lpop,sadd,zadd,hset -p 6381 -q
+SET: 50125.31 requests per second, p50=6.207 msec                    
+GET: 52132.21 requests per second, p50=5.919 msec                    
+LPUSH: 51245.26 requests per second, p50=5.951 msec                    
+LPOP: 52614.96 requests per second, p50=5.895 msec                    
+SADD: 50342.33 requests per second, p50=5.991 msec                    
+HSET: 51109.07 requests per second, p50=5.863 msec                    
+ZADD: 51615.57 requests per second, p50=6.031 msec      
+```
+
