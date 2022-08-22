@@ -327,8 +327,8 @@ func (m *MultiDB) execMove(command redis.Command) *redis.RespCommand {
 	targetDB := m.dbSet[dbIndex].(*SingleDB)
 
 	// get key's value and target db's value
-	entry, exists := currentDB.getEntry(key)
-	_, duplicate := targetDB.getEntry(key)
+	entry, exists := currentDB.GetEntry(key)
+	_, duplicate := targetDB.GetEntry(key)
 	// if key doesn't exist or target database already has key
 	if !exists || duplicate {
 		return redis.NewNumberCommand(0)
