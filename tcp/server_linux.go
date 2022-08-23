@@ -4,7 +4,7 @@
 package tcp
 
 import (
-	"bufio"
+	"io"
 	"log"
 	"os"
 	"os/signal"
@@ -88,8 +88,13 @@ func (es *EpollServer) Start() error {
 }
 
 func (es *EpollServer) onReadEvent(conn *EpollConnection) error {
-	reader := bufio.NewReader(conn)
-	command, err := redis.Decode(reader)
+	// 尽可能一次读取所有可读数据，减少Read系统调用
+	payload, err := io.ReadAll(conn)
+	if err != nil {
+		return err
+	}
+	conn.readBuffer.Write(payload)
+	command, err := redis.Decode(conn.readBuffer)
 	if err != nil {
 		return err
 	}
