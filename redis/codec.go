@@ -1,14 +1,18 @@
 package redis
 
 import (
-	"bufio"
 	"errors"
 	"io"
 	"strconv"
 	"strings"
 )
 
-func Decode(reader *bufio.Reader) (*RespCommand, error) {
+type CodecBuffer interface {
+	io.Reader
+	ReadBytes(delim byte) ([]byte, error)
+}
+
+func Decode(reader CodecBuffer) (*RespCommand, error) {
 	msg, ioErr, err := readLine(reader)
 	if ioErr {
 		return nil, io.EOF
@@ -130,7 +134,7 @@ func readBulkString(reader io.Reader, lengthStr []byte) ([]byte, error) {
 	return buffer[0:length], nil
 }
 
-func readArray(reader *bufio.Reader, size int) ([][]byte, error) {
+func readArray(reader CodecBuffer, size int) ([][]byte, error) {
 	parts := make([][]byte, size)
 	for i := 0; i < size; i++ {
 		// read a line
@@ -152,7 +156,7 @@ func readArray(reader *bufio.Reader, size int) ([][]byte, error) {
 	return parts, nil
 }
 
-func readLine(reader *bufio.Reader) ([]byte, bool, error) {
+func readLine(reader CodecBuffer) ([]byte, bool, error) {
 	msg, err := reader.ReadBytes('\n')
 	if err != nil {
 		return nil, true, err
