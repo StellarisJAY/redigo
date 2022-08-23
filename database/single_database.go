@@ -21,13 +21,11 @@ type SingleDB struct {
 	addAof     func([][]byte)
 	versionMap dict.Dict
 
-	lruHead *database.Entry
-	lruTail *database.Entry
-
-	memCounter *MemoryCounter
+	lru LRU
 }
 
-func NewSingleDB(idx int, counter *MemoryCounter) *SingleDB {
+func NewSingleDB(idx int) *SingleDB {
+	maxMemory := config.Properties.MaxMemory
 	db := &SingleDB{
 		data:       dict.NewSimpleDict(),
 		ttlMap:     dict.NewSimpleDict(),
@@ -35,12 +33,15 @@ func NewSingleDB(idx int, counter *MemoryCounter) *SingleDB {
 		idx:        idx,
 		versionMap: dict.NewSimpleDict(),
 		addAof:     func(i [][]byte) {},
-		lruHead:    &database.Entry{},
-		lruTail:    &database.Entry{},
-		memCounter: counter,
 	}
-	db.lruHead.NextLRUEntry = db.lruTail
-	db.lruTail.PrevLRUEntry = db.lruHead
+	if maxMemory == -1 {
+		db.lru = &NoLRU{}
+	} else {
+		// todo 最佳的lru-k策略？
+		db.lru = NewTwoQueueLRU(maxMemory, maxMemory/3, 3, db.onKeyEvict)
+	}
+	//db.lruHead.NextLRUEntry = db.lruTail
+	//db.lruTail.PrevLRUEntry = db.lruHead
 	return db
 }
 
@@ -185,26 +186,29 @@ func (db *SingleDB) expireIfNeeded(key string) bool {
 	return false
 }
 
-// GetEntry get the data entry holding the key's value. Checking key's existence and expire time
-func (db *SingleDB) GetEntry(key string, dbIndex ...int) (*database.Entry, bool) {
+// GetEntry 获取一个Key的Entry，获取的同时检查TTL，并进行LRU
+func (db *SingleDB) GetEntry(key string) (*database.Entry, bool) {
 	v, ok := db.data.Get(key)
 	if !ok || db.expireIfNeeded(key) {
 		return nil, false
 	}
 	entry := v.(*database.Entry)
 	// get触发将数据移动到LRU队列尾部
-	db.lruMoveEntryToTail(entry)
+	//db.lruMoveEntryToTail(entry)
+	db.lru.addAccessHistory(entry, entry.DataSize)
 	return entry, true
 }
 
-// DeleteEntry removes a key from single db and remove all the associate data like ttl and lru
-func (db *SingleDB) DeleteEntry(key string, dbIndex ...int) (*database.Entry, bool) {
+// DeleteEntry 删除一个key，并将key关联的LRU、TTL删除
+func (db *SingleDB) DeleteEntry(key string) (*database.Entry, bool) {
 	if entry, ok := db.GetEntry(key); !ok {
 		return nil, false
 	} else {
 		db.data.Remove(key)
 		db.ttlMap.Remove(key)
-		db.lruRemoveEntry(entry)
+		db.versionMap.Remove(key)
+		//db.lruRemoveEntry(entry)
+		db.lru.removeEntry(entry)
 		return entry, true
 	}
 }
@@ -230,7 +234,9 @@ func (db *SingleDB) flushDB(async bool) {
 	if !async {
 		db.data.Clear()
 	} else {
+		// 获取当前存在的所有key
 		keys := db.data.Keys()
+		// 开启goroutine删除每一个key
 		go func(keys []string) {
 			for _, key := range keys {
 				db.data.Remove(key)
@@ -267,10 +273,10 @@ func (db *SingleDB) RenameNX(oldKey, newKey string) (int, error) {
 }
 
 func (db *SingleDB) Close() {
-	//TODO implement me
-	panic("implement me")
+
 }
 
+// randomKeys 获取 samples 个数的随机keys
 func (db *SingleDB) randomKeys(samples int) []string {
 	keys := db.data.RandomKeysDistinct(samples)
 	return keys
@@ -286,10 +292,10 @@ func (db *SingleDB) Dump(key string) ([]byte, error) {
 
 // lruMoveEntryToTail 将entry移动到LRU队列尾部
 func (db *SingleDB) lruMoveEntryToTail(entry *database.Entry) {
-	if db.memCounter.maxMemory != -1 {
-		db.lruRemoveEntry(entry)
-		db.lruAddEntry(entry)
-	}
+	//if db.memCounter.maxMemory != -1 {
+	//	db.lruRemoveEntry(entry)
+	//	db.lruAddEntry(entry)
+	//}
 }
 
 // lruRemoveEntry 从LRU队列删除某个entry
@@ -302,51 +308,56 @@ func (db *SingleDB) lruRemoveEntry(entry *database.Entry) {
 
 // lruAddEntry 在LRU队列尾部添加entry
 func (db *SingleDB) lruAddEntry(entry *database.Entry) {
-	entry.PrevLRUEntry = db.lruTail.PrevLRUEntry
-	entry.NextLRUEntry = db.lruTail
-	db.lruTail.PrevLRUEntry.NextLRUEntry = entry
-	db.lruTail.PrevLRUEntry = entry
+	//entry.PrevLRUEntry = db.lruTail.PrevLRUEntry
+	//entry.NextLRUEntry = db.lruTail
+	//db.lruTail.PrevLRUEntry.NextLRUEntry = entry
+	//db.lruTail.PrevLRUEntry = entry
 }
 
 // evict 内存淘汰，直到已占用内存达到小于等于目标值
 func (db *SingleDB) evict(targetMemory int64) {
-	for targetMemory < db.memCounter.usedMemory {
-		// 如果lru队列已经没有entry了
-		if entry := db.lruHead.NextLRUEntry; entry == db.lruTail {
-			break
-		} else {
-			// volatile-lru，跳过没有超时时间的key
-			if config.Properties.EvictPolicy == config.EvictVolatileLRU {
-				if _, ok := db.ttlMap.Get(entry.Key); ok {
-					continue
-				}
-			}
-			db.lruRemoveEntry(entry)
-			db.memCounter.usedMemory -= entry.DataSize
-			db.data.Remove(entry.Key)
-			log.Println("evict entry, key: ", entry.Key, ", value size: ", entry.DataSize, "bytes")
-		}
-	}
+	//for targetMemory < db.memCounter.usedMemory {
+	//	// 如果lru队列已经没有entry了
+	//	if entry := db.lruHead.NextLRUEntry; entry == db.lruTail {
+	//		break
+	//	} else {
+	//		// volatile-lru，跳过没有超时时间的key
+	//		if config.Properties.EvictPolicy == config.EvictVolatileLRU {
+	//			if _, ok := db.ttlMap.Get(entry.Key); ok {
+	//				continue
+	//			}
+	//		}
+	//		db.lruRemoveEntry(entry)
+	//		//db.memCounter.usedMemory -= entry.DataSize
+	//		db.data.Remove(entry.Key)
+	//		log.Println("evict entry, key: ", entry.Key, ", value size: ", entry.DataSize, "bytes")
+	//	}
+	//}
 }
 
+// freeMemoryIfNeeded 如果开启了最大内存配置，该方法会进行内存淘汰
 func (db *SingleDB) freeMemoryIfNeeded(targetMemory int64) {
-	if db.memCounter.maxMemory == -1 {
-		return
-	}
-	db.evict(targetMemory)
+	//if db.memCounter.maxMemory == -1 {
+	//	return
+	//}
+	//db.evict(targetMemory)
 }
 
+// putEntry 添加新的Entry，添加前进行内存淘汰
 func (db *SingleDB) putEntry(entry *database.Entry) int {
+
 	// 放入新的数据前，先进行内存淘汰
-	db.freeMemoryIfNeeded(db.memCounter.maxMemory - entry.DataSize)
+	//db.freeMemoryIfNeeded(db.memCounter.maxMemory - entry.DataSize)
 	result := db.data.Put(entry.Key, entry)
 	if result != 0 {
-		db.lruAddEntry(entry)
-		db.memCounter.usedMemory += entry.DataSize
+		db.lru.addEntry(entry)
+		//db.lruAddEntry(entry)
+		//db.memCounter.usedMemory += entry.DataSize
 	}
 	return result
 }
 
+// putOrUpdateEntry 添加新的Entry或者更新entry的值，该操作会导致LRU
 func (db *SingleDB) putOrUpdateEntry(entry *database.Entry) int {
 	if old, ok := db.data.Get(entry.Key); ok {
 		oldEntry := old.(*database.Entry)
@@ -373,10 +384,11 @@ func (db *SingleDB) putIfExists(key string, value []byte) int {
 		entry.Data = value
 		oldSize := entry.DataSize
 		entry.DataSize = int64(len(value))
-		db.lruMoveEntryToTail(entry)
-		db.freeMemoryIfNeeded(db.memCounter.maxMemory - entry.DataSize)
-		db.memCounter.usedMemory += entry.DataSize
-		db.memCounter.usedMemory -= oldSize
+		db.lru.addAccessHistory(entry, oldSize)
+		//db.lruMoveEntryToTail(entry)
+		//db.freeMemoryIfNeeded(db.memCounter.maxMemory - entry.DataSize)
+		//db.memCounter.usedMemory += entry.DataSize
+		//db.memCounter.usedMemory -= oldSize
 	}
 	return 0
 }
@@ -386,9 +398,17 @@ func (db *SingleDB) updateEntry(entry *database.Entry, value []byte) {
 	entry.Data = value
 	oldSize := entry.DataSize
 	entry.DataSize = int64(len(value))
-	// 先更新数据，然后再淘汰内存
-	db.lruMoveEntryToTail(entry)
-	db.freeMemoryIfNeeded(db.memCounter.maxMemory - entry.DataSize + oldSize)
-	db.memCounter.usedMemory += entry.DataSize
-	db.memCounter.usedMemory -= oldSize
+	db.lru.addAccessHistory(entry, oldSize)
+	//// 先更新数据，然后再淘汰内存
+	//db.lruMoveEntryToTail(entry)
+	//db.freeMemoryIfNeeded(db.memCounter.maxMemory - entry.DataSize + oldSize)
+	//db.memCounter.usedMemory += entry.DataSize
+	//db.memCounter.usedMemory -= oldSize
+}
+
+func (db *SingleDB) onKeyEvict(key string, value interface{}) {
+	db.data.Remove(key)
+	db.ttlMap.Remove(key)
+	db.versionMap.Remove(key)
+	log.Printf("key: %s evicted", key)
 }

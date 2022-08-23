@@ -17,9 +17,6 @@ type DB interface {
 	Len(dbIdx int) int
 
 	OnConnectionClosed(conn redis.Connection)
-
-	GetEntry(key string, dbIndex ...int) (*Entry, bool)
-	DeleteEntry(key string, dbIndex ...int) (*Entry, bool)
 }
 
 /*
@@ -28,8 +25,8 @@ type DB interface {
 type Entry struct {
 	Key          string
 	Data         interface{}
-	LRUTime      uint32 // LRU Idle time used in approx LRU eviction
 	NextLRUEntry *Entry
 	PrevLRUEntry *Entry
 	DataSize     int64
+	AccessCount  int
 }

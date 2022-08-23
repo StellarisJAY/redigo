@@ -36,7 +36,7 @@ func NewTempDB(dbSize int) *MultiDB {
 	db.initCommandExecutors()
 	// initialize single databases in db set
 	for i := 0; i < dbSize; i++ {
-		db.dbSet[i] = NewSingleDB(i, db.memCounter)
+		db.dbSet[i] = NewSingleDB(i)
 	}
 	return db
 }
@@ -52,7 +52,7 @@ func NewMultiDB(dbSize, cmdChanSize int) *MultiDB {
 	db.initCommandExecutors()
 	// initialize single databases in db set
 	for i := 0; i < dbSize; i++ {
-		db.dbSet[i] = NewSingleDB(i, db.memCounter)
+		db.dbSet[i] = NewSingleDB(i)
 	}
 	// initialize AOF
 	if config.Properties.AppendOnly {
@@ -153,20 +153,6 @@ func (m *MultiDB) Execute(command redis.Command) *redis.RespCommand {
 func (m *MultiDB) OnConnectionClosed(conn redis.Connection) {
 	// un-subscribe all channels of this connection
 	m.hub.UnSubscribeAll(conn)
-}
-
-func (m *MultiDB) GetEntry(key string, dbIndex ...int) (*database.Entry, bool) {
-	if dbIndex == nil || len(dbIndex) == 0 {
-		return nil, false
-	}
-	return m.dbSet[dbIndex[0]].GetEntry(key)
-}
-
-func (m *MultiDB) DeleteEntry(key string, dbIndex ...int) (*database.Entry, bool) {
-	if dbIndex == nil || len(dbIndex) == 0 {
-		return nil, false
-	}
-	return m.dbSet[dbIndex[0]].DeleteEntry(key)
 }
 
 func (m *MultiDB) executeCommand(command redis.Command) *redis.RespCommand {
