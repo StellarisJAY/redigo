@@ -4,18 +4,20 @@
 package tcp
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"golang.org/x/sys/unix"
 	"io"
 	"log"
 	"net"
-	"redigo/datastruct/list"
 	"redigo/redis"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
 	"syscall"
+	"unsafe"
 )
 
 const (
@@ -39,7 +41,9 @@ type EpollConnection struct {
 	watching     map[string]int64
 	cmdQueue     []*redis.RespCommand
 	epollManager *EpollManager
-	replyQueue   *list.LinkedList
+
+	readBuffer  *bytes.Buffer
+	writeBuffer *bytes.Buffer
 }
 
 func NewEpoll() *EpollManager {
@@ -54,7 +58,8 @@ func NewEpollConnection(fd int, epollManager *EpollManager) *EpollConnection {
 		watching:     make(map[string]int64),
 		cmdQueue:     make([]*redis.RespCommand, 0),
 		epollManager: epollManager,
-		replyQueue:   list.NewLinkedList(),
+		writeBuffer:  &bytes.Buffer{},
+		readBuffer:   &bytes.Buffer{},
 	}
 }
 
@@ -126,18 +131,21 @@ func (e *EpollManager) CloseConn(conn *EpollConnection) error {
 func (e *EpollManager) Handle() error {
 	for {
 		events := make([]syscall.EpollEvent, 1024)
-		n, err := syscall.EpollWait(e.epollFd, events, e.waitMsec)
+		n, err := EpollWait(e.epollFd, events, e.waitMsec)
+		//n, err := syscall.EpollWait(e.epollFd, events, e.waitMsec)
 		if err != nil {
 			if err.Error() == "interrupted system call" {
-				log.Println("interrupted system call")
 				continue
 			}
 			return fmt.Errorf("epoll wait error: %v", err)
 		}
+		// 没有事件，进入阻塞模式
 		if n <= 0 {
 			e.waitMsec = -1
+			runtime.Gosched()
 			continue
 		}
+		// 有事件，继续无阻塞循环
 		e.waitMsec = 0
 		for i := 0; i < n; i++ {
 			// 通过fd查询到一个连接对象
@@ -162,8 +170,9 @@ func (e *EpollManager) Handle() error {
 				}
 			}
 			if events[i].Events&EpollWritable == EpollWritable {
-				for conn.replyQueue.Size() > 0 {
-					payload := conn.replyQueue.RemoveLeft()
+				// 批量写入数据，减少系统调用次数
+				if n := conn.writeBuffer.Len(); n > 0 {
+					payload := conn.writeBuffer.Next(n)
 					_, err := conn.Write(payload)
 					if err != nil {
 						log.Println("write error: ", err)
@@ -174,6 +183,21 @@ func (e *EpollManager) Handle() error {
 			}
 		}
 	}
+}
+
+// EpollWait 封装EpollWait系统调用，使用RawSyscall来避免runtime.
+func EpollWait(epfd int, events []syscall.EpollEvent, msec int) (n int, err error) {
+	var r0 uintptr
+	var _p0 = unsafe.Pointer(&events[0])
+	if msec == 0 {
+		r0, _, err = syscall.RawSyscall6(syscall.SYS_EPOLL_WAIT, uintptr(epfd), uintptr(_p0), uintptr(len(events)), 0, 0, 0)
+	} else {
+		r0, _, err = syscall.Syscall6(syscall.SYS_EPOLL_WAIT, uintptr(epfd), uintptr(_p0), uintptr(len(events)), uintptr(msec), 0, 0)
+	}
+	if err == syscall.Errno(0) {
+		err = nil
+	}
+	return int(r0), err
 }
 
 func (e *EpollManager) Close() {
@@ -202,8 +226,8 @@ func (c *EpollConnection) Close() {
 
 func (c *EpollConnection) SendCommand(command *redis.RespCommand) {
 	payload := redis.Encode(command)
-	c.replyQueue.AddRight(payload)
-	//_, _ = c.Write(payload)
+	// 写入writeBuffer，等待批量写入 连接
+	c.writeBuffer.Write(payload)
 }
 
 func (c *EpollConnection) SelectDB(index int) {
