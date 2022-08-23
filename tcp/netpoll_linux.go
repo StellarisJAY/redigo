@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"unsafe"
 )
@@ -44,6 +45,7 @@ type EpollConnection struct {
 
 	readBuffer  *bytes.Buffer
 	writeBuffer *bytes.Buffer
+	active      uint32
 }
 
 func NewEpoll() *EpollManager {
@@ -60,6 +62,7 @@ func NewEpollConnection(fd int, epollManager *EpollManager) *EpollConnection {
 		epollManager: epollManager,
 		writeBuffer:  &bytes.Buffer{},
 		readBuffer:   &bytes.Buffer{},
+		active:       1,
 	}
 }
 
@@ -99,7 +102,7 @@ func (e *EpollManager) Listen(address string) error {
 	return nil
 }
 
-func (e *EpollManager) accept() error {
+func (e *EpollManager) Accept() error {
 	nfd, _, err := syscall.Accept(e.sockFd)
 	if err != nil {
 		return err
@@ -120,11 +123,15 @@ func (e *EpollManager) accept() error {
 }
 
 func (e *EpollManager) CloseConn(conn *EpollConnection) error {
+	// set conn inactive
+	atomic.StoreUint32(&conn.active, 0)
+	// epoll ctrl del
 	err := syscall.EpollCtl(e.epollFd, syscall.EPOLL_CTL_DEL, conn.fd, nil)
 	if err != nil {
 		return err
 	}
 	e.conns.Delete(conn.fd)
+	// close connection
 	return syscall.Close(conn.fd)
 }
 
@@ -132,7 +139,6 @@ func (e *EpollManager) Handle() error {
 	for {
 		events := make([]syscall.EpollEvent, 1024)
 		n, err := EpollWait(e.epollFd, events, e.waitMsec)
-		//n, err := syscall.EpollWait(e.epollFd, events, e.waitMsec)
 		if err != nil {
 			if err.Error() == "interrupted system call" {
 				continue
@@ -213,11 +219,11 @@ func (c *EpollConnection) Write(payload []byte) (int, error) {
 }
 
 func (c *EpollConnection) ReadLoop() error {
-	panic("implement me")
+	panic("read loop not available in epoll")
 }
 
 func (c *EpollConnection) WriteLoop() error {
-	panic("implement me")
+	panic("write loop not available in epoll")
 }
 
 func (c *EpollConnection) Close() {
@@ -267,7 +273,7 @@ func (c *EpollConnection) UnWatch() {
 }
 
 func (c *EpollConnection) Active() bool {
-	panic("operation not available")
+	return atomic.LoadUint32(&c.active) == 1
 }
 
 func (c *EpollConnection) RemoteAddr() string {
