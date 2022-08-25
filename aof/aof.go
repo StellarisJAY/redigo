@@ -22,14 +22,14 @@ type Payload struct {
 
 type Handler struct {
 	db             database.DB
-	aofChan        chan Payload // aof command buffer, commands stored in here before writes to file
+	aofChan        chan Payload // aofChan AOF持久化缓冲，AOF异步写入磁盘
 	aofFileName    string
 	aofFile        *os.File
-	currentDB      int          // current database index, if index changed, must append a SELECT command
-	ticker         *time.Ticker // ticker for EverySec policy
+	currentDB      int          // currentDB aof持久化过程中需要记录当前数据库，在切换时aof要插入select命令
+	ticker         *time.Ticker // ticker everysec 策略的计时器
 	closeChan      chan struct{}
 	aofLock        sync.Mutex
-	dbMaker        func() database.DB
+	dbMaker        func() database.DB // dbMaker 在aof重写时用来创建临时的内存数据库
 	RewriteStarted atomic.Value
 }
 

@@ -5,7 +5,6 @@ import (
 	"log"
 	"redigo/config"
 	"redigo/datastruct/dict"
-	"redigo/datastruct/lock"
 	"redigo/interface/database"
 	"redigo/rdb"
 	"redigo/redis"
@@ -14,14 +13,12 @@ import (
 )
 
 type SingleDB struct {
-	data       dict.Dict
-	ttlMap     dict.Dict
-	lock       *lock.Locker
-	idx        int
-	addAof     func([][]byte)
-	versionMap dict.Dict
-
-	lru LRU
+	data       dict.Dict      // data key-value map
+	ttlMap     dict.Dict      // ttlMap 记录key与过期时间的映射关系
+	idx        int            // idx 该数据库的index
+	addAof     func([][]byte) // addAof 写入AOF的函数，执行命令时通过调用该函数进行AOF持久化
+	versionMap dict.Dict      // versionMap key版本映射，主要用在发布订阅功能上，用来判断key的变化
+	lru        LRU            // lru LRU-K算法实现
 }
 
 func NewSingleDB(idx int) *SingleDB {
@@ -29,7 +26,6 @@ func NewSingleDB(idx int) *SingleDB {
 	db := &SingleDB{
 		data:       dict.NewSimpleDict(),
 		ttlMap:     dict.NewSimpleDict(),
-		lock:       lock.NewLock(1024),
 		idx:        idx,
 		versionMap: dict.NewSimpleDict(),
 		addAof:     func(i [][]byte) {},
@@ -40,8 +36,6 @@ func NewSingleDB(idx int) *SingleDB {
 		// todo 最佳的lru-k策略？
 		db.lru = NewTwoQueueLRU(maxMemory, maxMemory/3, 3, db.onKeyEvict)
 	}
-	//db.lruHead.NextLRUEntry = db.lruTail
-	//db.lruTail.PrevLRUEntry = db.lruHead
 	return db
 }
 
@@ -290,69 +284,11 @@ func (db *SingleDB) Dump(key string) ([]byte, error) {
 	return rdb.SerializeEntry(key, entry)
 }
 
-// lruMoveEntryToTail 将entry移动到LRU队列尾部
-func (db *SingleDB) lruMoveEntryToTail(entry *database.Entry) {
-	//if db.memCounter.maxMemory != -1 {
-	//	db.lruRemoveEntry(entry)
-	//	db.lruAddEntry(entry)
-	//}
-}
-
-// lruRemoveEntry 从LRU队列删除某个entry
-func (db *SingleDB) lruRemoveEntry(entry *database.Entry) {
-	entry.NextLRUEntry.PrevLRUEntry = entry.PrevLRUEntry
-	entry.PrevLRUEntry.NextLRUEntry = entry.NextLRUEntry
-	entry.NextLRUEntry = nil
-	entry.PrevLRUEntry = nil
-}
-
-// lruAddEntry 在LRU队列尾部添加entry
-func (db *SingleDB) lruAddEntry(entry *database.Entry) {
-	//entry.PrevLRUEntry = db.lruTail.PrevLRUEntry
-	//entry.NextLRUEntry = db.lruTail
-	//db.lruTail.PrevLRUEntry.NextLRUEntry = entry
-	//db.lruTail.PrevLRUEntry = entry
-}
-
-// evict 内存淘汰，直到已占用内存达到小于等于目标值
-func (db *SingleDB) evict(targetMemory int64) {
-	//for targetMemory < db.memCounter.usedMemory {
-	//	// 如果lru队列已经没有entry了
-	//	if entry := db.lruHead.NextLRUEntry; entry == db.lruTail {
-	//		break
-	//	} else {
-	//		// volatile-lru，跳过没有超时时间的key
-	//		if config.Properties.EvictPolicy == config.EvictVolatileLRU {
-	//			if _, ok := db.ttlMap.Get(entry.Key); ok {
-	//				continue
-	//			}
-	//		}
-	//		db.lruRemoveEntry(entry)
-	//		//db.memCounter.usedMemory -= entry.DataSize
-	//		db.data.Remove(entry.Key)
-	//		log.Println("evict entry, key: ", entry.Key, ", value size: ", entry.DataSize, "bytes")
-	//	}
-	//}
-}
-
-// freeMemoryIfNeeded 如果开启了最大内存配置，该方法会进行内存淘汰
-func (db *SingleDB) freeMemoryIfNeeded(targetMemory int64) {
-	//if db.memCounter.maxMemory == -1 {
-	//	return
-	//}
-	//db.evict(targetMemory)
-}
-
 // putEntry 添加新的Entry，添加前进行内存淘汰
 func (db *SingleDB) putEntry(entry *database.Entry) int {
-
-	// 放入新的数据前，先进行内存淘汰
-	//db.freeMemoryIfNeeded(db.memCounter.maxMemory - entry.DataSize)
 	result := db.data.Put(entry.Key, entry)
 	if result != 0 {
 		db.lru.addEntry(entry)
-		//db.lruAddEntry(entry)
-		//db.memCounter.usedMemory += entry.DataSize
 	}
 	return result
 }
@@ -385,10 +321,6 @@ func (db *SingleDB) putIfExists(key string, value []byte) int {
 		oldSize := entry.DataSize
 		entry.DataSize = int64(len(value))
 		db.lru.addAccessHistory(entry, oldSize)
-		//db.lruMoveEntryToTail(entry)
-		//db.freeMemoryIfNeeded(db.memCounter.maxMemory - entry.DataSize)
-		//db.memCounter.usedMemory += entry.DataSize
-		//db.memCounter.usedMemory -= oldSize
 	}
 	return 0
 }
@@ -399,11 +331,6 @@ func (db *SingleDB) updateEntry(entry *database.Entry, value []byte) {
 	oldSize := entry.DataSize
 	entry.DataSize = int64(len(value))
 	db.lru.addAccessHistory(entry, oldSize)
-	//// 先更新数据，然后再淘汰内存
-	//db.lruMoveEntryToTail(entry)
-	//db.freeMemoryIfNeeded(db.memCounter.maxMemory - entry.DataSize + oldSize)
-	//db.memCounter.usedMemory += entry.DataSize
-	//db.memCounter.usedMemory -= oldSize
 }
 
 func (db *SingleDB) onKeyEvict(key string, value interface{}) {

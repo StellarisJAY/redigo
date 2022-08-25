@@ -12,26 +12,24 @@ import (
 	"time"
 )
 
+/*
+	MultiDB multiDB 是DB接口的多数据库实现。
+	提供了Redis中的切换数据库、移动key、持久化等跨数据库命令。
+*/
 type MultiDB struct {
-	dbSet      []database.DB
-	cmdChan    chan redis.Command
-	executors  map[string]func(redis.Command) *redis.RespCommand
-	aofHandler *aof.Handler
-	hub        *pubsub.Hub
-	memCounter *MemoryCounter
+	dbSet      []database.DB                                     // dbSet 数据库集合，默认是16个单独的数据库
+	cmdChan    chan redis.Command                                // cmdChan 并发模式下的命令缓冲channel
+	executors  map[string]func(redis.Command) *redis.RespCommand // executors 命令执行器map，记录命令与executor的映射
+	aofHandler *aof.Handler                                      // aofHandler AOF持久化功能组件
+	hub        *pubsub.Hub                                       // hub 发布订阅功能组件
 }
 
-type MemoryCounter struct {
-	maxMemory  int64
-	usedMemory int64
-}
-
+// NewTempDB 创建临时数据库，临时数据库只用在AOF重写上
 func NewTempDB(dbSize int) *MultiDB {
 	db := &MultiDB{
-		dbSet:      make([]database.DB, dbSize),
-		cmdChan:    make(chan redis.Command, 0),
-		executors:  make(map[string]func(redis.Command) *redis.RespCommand),
-		memCounter: &MemoryCounter{maxMemory: config.Properties.MaxMemory, usedMemory: 0},
+		dbSet:     make([]database.DB, dbSize),
+		cmdChan:   make(chan redis.Command, 0),
+		executors: make(map[string]func(redis.Command) *redis.RespCommand),
 	}
 	db.initCommandExecutors()
 	// initialize single databases in db set
@@ -43,11 +41,10 @@ func NewTempDB(dbSize int) *MultiDB {
 
 func NewMultiDB(dbSize, cmdChanSize int) *MultiDB {
 	db := &MultiDB{
-		dbSet:      make([]database.DB, dbSize),
-		cmdChan:    make(chan redis.Command, cmdChanSize),
-		executors:  make(map[string]func(redis.Command) *redis.RespCommand),
-		hub:        pubsub.MakeHub(),
-		memCounter: &MemoryCounter{maxMemory: config.Properties.MaxMemory},
+		dbSet:     make([]database.DB, dbSize),
+		cmdChan:   make(chan redis.Command, cmdChanSize),
+		executors: make(map[string]func(redis.Command) *redis.RespCommand),
+		hub:       pubsub.MakeHub(),
 	}
 	db.initCommandExecutors()
 	// initialize single databases in db set
@@ -71,6 +68,7 @@ func NewMultiDB(dbSize, cmdChanSize int) *MultiDB {
 		}
 		db.aofHandler = aofHandler
 	} else {
+		// dummyHandler 是没有开启aof时的空handler
 		db.aofHandler = aof.NewDummyAofHandler()
 	}
 	rdbStart := time.Now()
