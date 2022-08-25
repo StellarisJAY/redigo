@@ -34,10 +34,10 @@ type TwoQueueLRU struct {
 	recentSize   int64
 	frequentSize int64
 
-	upgradeThreshold int
+	k int // k LRU-K 算法的k值，当一个key的访问计数达到 k 才能移动到队尾
 
 	recent   *LRUQueue // recent 记录最新加入缓存的数据
-	frequent *LRUQueue // frequent 当 recent 中的数据被访问超过2次后，会晋升到 frequent 队列中
+	frequent *LRUQueue // frequent 当 recent 中的数据被访问超过 k 次后，会晋升到 frequent 队列中
 
 	onEvict func(key string, value interface{}, dataSize int64)
 }
@@ -53,16 +53,16 @@ func newLRUQueue() *LRUQueue {
 }
 
 // NewTwoQueueLRU 创建双队列LRU，参数：内存上限、recent队列上限、晋升队列的访问次数、evict淘汰回调
-func NewTwoQueueLRU(capacity int64, recentCap int64, upgradeThreshold int, onEvict func(key string, value interface{})) *TwoQueueLRU {
+func NewTwoQueueLRU(capacity int64, recentCap int64, k int, onEvict func(key string, value interface{})) *TwoQueueLRU {
 	return &TwoQueueLRU{
-		capacity:         capacity,
-		recentCap:        recentCap,
-		recentSize:       0,
-		frequentCap:      capacity - recentCap,
-		frequentSize:     0,
-		upgradeThreshold: upgradeThreshold,
-		recent:           newLRUQueue(),
-		frequent:         newLRUQueue(),
+		capacity:     capacity,
+		recentCap:    recentCap,
+		recentSize:   0,
+		frequentCap:  capacity - recentCap,
+		frequentSize: 0,
+		k:            k,
+		recent:       newLRUQueue(),
+		frequent:     newLRUQueue(),
 		onEvict: func(key string, value interface{}, dataSize int64) {
 			// 避免回调方法出错
 			defer func() {
@@ -110,7 +110,11 @@ func (f *LRUQueue) moveToTail(entry *database.Entry) {
 // addAccessHistory 增加访问记录，如果entry当前在recent中且访问次数超过了晋升条件，则转移到frequent队列
 func (tq *TwoQueueLRU) addAccessHistory(entry *database.Entry, oldSize int64) {
 	if entry.AccessCount < 0 {
-		tq.frequent.moveToTail(entry)
+		entry.AccessCount -= 1
+		// 当frequent队列的计数达到k以后，才能将key移动到队列尾部
+		if entry.AccessCount == tq.k {
+			tq.frequent.moveToTail(entry)
+		}
 		if oldSize > entry.DataSize {
 			tq.frequentSize -= oldSize - entry.DataSize
 		} else if oldSize < entry.DataSize {
@@ -119,7 +123,7 @@ func (tq *TwoQueueLRU) addAccessHistory(entry *database.Entry, oldSize int64) {
 	} else {
 		entry.AccessCount++
 		// 如果访问次数达到晋升要求，将entry从recent转移到frequent
-		if entry.AccessCount == tq.upgradeThreshold {
+		if entry.AccessCount == tq.k {
 			tq.recentSize -= oldSize
 			tq.freeFrequentMemory(tq.recentCap - entry.DataSize)
 			tq.recent.remove(entry)
