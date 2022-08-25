@@ -54,7 +54,7 @@ func (es *EpollServer) Start() error {
 
 	go func() {
 		for {
-			err := es.em.accept()
+			err := es.em.Accept()
 			if err != nil {
 				log.Println("accept error: ", err)
 				close(es.closeChan)
