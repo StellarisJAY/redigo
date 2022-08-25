@@ -112,8 +112,9 @@ func (tq *TwoQueueLRU) addAccessHistory(entry *database.Entry, oldSize int64) {
 	if entry.AccessCount < 0 {
 		entry.AccessCount -= 1
 		// 当frequent队列的计数达到k以后，才能将key移动到队列尾部
-		if entry.AccessCount == tq.k {
+		if entry.AccessCount == -tq.k-1 {
 			tq.frequent.moveToTail(entry)
+			entry.AccessCount = -1
 		}
 		if oldSize > entry.DataSize {
 			tq.frequentSize -= oldSize - entry.DataSize
