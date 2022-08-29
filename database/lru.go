@@ -1,8 +1,8 @@
 package database
 
 import (
-	"log"
 	"redigo/interface/database"
+	"redigo/util/log"
 )
 
 // LRU 接口，提供一个LRU算法必备的几个方法
@@ -67,7 +67,7 @@ func NewTwoQueueLRU(capacity int64, recentCap int64, k int, onEvict func(key str
 			// 避免回调方法出错
 			defer func() {
 				if err := recover(); err != nil {
-					log.Println("evict function error:", err)
+					log.Errorf("evict function error: %v", err)
 				}
 			}()
 			onEvict(key, value)

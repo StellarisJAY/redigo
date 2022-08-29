@@ -3,11 +3,11 @@ package aof
 import (
 	"io"
 	"io/ioutil"
-	"log"
 	"os"
 	"redigo/config"
 	"redigo/interface/database"
 	"redigo/redis"
+	"redigo/util/log"
 	"strconv"
 	"time"
 )
@@ -37,10 +37,10 @@ func (h *Handler) StartRewrite() error {
 		start := time.Now()
 		err := h.rewrite()
 		if err != nil {
-			log.Println(err)
+			log.Errorf("rewrite aof error: %v", err)
 		}
 		h.RewriteStarted.Store(false)
-		log.Println("Rewrite AOF finished, time used: ", time.Now().Sub(start).Milliseconds(), "ms")
+		log.Info("Rewrite AOF finished, time used: %d ms", time.Now().Sub(start).Milliseconds())
 	}()
 	return nil
 }
@@ -131,13 +131,13 @@ func (h *Handler) finishRewrite(ctx *rewriteContext) error {
 		_ = src.Close()
 	}()
 	if err != nil {
-		log.Println("Open old aof file failed ", err)
+		log.Errorf("Open old aof file failed: %v", err)
 		return err
 	}
 	// seek the position of the original aof file before rewrite
 	_, err = src.Seek(ctx.oldFileSize, 0)
 	if err != nil {
-		log.Println("Seek offset in old aof file failed ", err)
+		log.Errorf("Seek offset in old aof file failed %v", err)
 		return err
 	}
 	// change temp file's database to online aof file's database before rewrite

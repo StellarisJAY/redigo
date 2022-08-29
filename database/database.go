@@ -1,13 +1,13 @@
 package database
 
 import (
-	"log"
 	"redigo/aof"
 	"redigo/config"
 	"redigo/interface/database"
 	"redigo/pubsub"
 	"redigo/rdb"
 	"redigo/redis"
+	"redigo/util/log"
 	"strconv"
 	"time"
 )
@@ -74,9 +74,9 @@ func NewMultiDB(dbSize, cmdChanSize int) *MultiDB {
 	rdbStart := time.Now()
 	err := loadRDB(db)
 	if err != nil {
-		log.Println("load rdb error: ", err)
+		log.Errorf("load rdb error: %v", err)
 	} else {
-		log.Println("RDB Loaded time used: ", time.Now().Sub(rdbStart).Milliseconds(), "ms")
+		log.Info("RDB Loaded time used: %d ms", time.Now().Sub(rdbStart).Milliseconds())
 	}
 	return db
 }
@@ -342,7 +342,7 @@ func (m *MultiDB) execSave(command redis.Command) *redis.RespCommand {
 	if err != nil {
 		return redis.NilCommand
 	}
-	log.Println("RDB saved, time used: ", time.Now().Sub(startTime).Milliseconds(), "ms")
+	log.Info("RDB saved, time used: %d ms", time.Now().Sub(startTime).Milliseconds())
 	return redis.OKCommand
 }
 
@@ -370,9 +370,9 @@ func (m *MultiDB) execBGSave(command redis.Command) *redis.RespCommand {
 		defer m.aofHandler.RewriteStarted.Store(false)
 		err := rdb.BGSave(entries)
 		if err != nil {
-			log.Println("BGSave RDB error: ", err)
+			log.Errorf("BGSave RDB error: %v", err)
 		} else {
-			log.Println("BGSave RDB finished: ", time.Now().Sub(startTime).Milliseconds(), "ms")
+			log.Info("BGSave RDB finished: %d ms", time.Now().Sub(startTime).Milliseconds())
 		}
 	}(snapshot, startTime)
 	return redis.NewSingleLineCommand([]byte("Background saving started"))

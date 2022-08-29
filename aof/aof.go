@@ -3,12 +3,12 @@ package aof
 import (
 	"bufio"
 	"io"
-	"log"
 	"os"
 	"redigo/config"
 	"redigo/interface/database"
 	"redigo/redis"
 	"redigo/tcp"
+	"redigo/util/log"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -58,13 +58,13 @@ func NewAofHandler(db database.DB, dbMaker func() database.DB) (*Handler, error)
 		return nil, err
 	}
 	handler.aofFile = file
-	log.Println("AOF enabled, aof file: ", config.Properties.AofFileName)
+	log.Info("AOF enabled, aof file: %s", config.Properties.AofFileName)
 	start := time.Now()
 	err = handler.loadAof(-1)
 	if err != nil {
 		panic(err)
 	}
-	log.Println("AOF loaded, time used: ", time.Now().Sub(start).Milliseconds(), "ms")
+	log.Info("AOF loaded, time used: %d ms", time.Now().Sub(start).Milliseconds())
 	go func() {
 		// fsync policy every sec
 		if config.Properties.AppendFsync == config.FsyncEverySec {
@@ -140,7 +140,7 @@ func (h *Handler) handlePayload(p Payload) {
 		raw := redis.NewStringArrayCommand(cmd)
 		_, err := h.aofFile.Write(raw.ToBytes())
 		if err != nil {
-			log.Println(err)
+			log.Errorf("aof write select db error: %v", err)
 			return
 		}
 		h.currentDB = p.idx
@@ -149,14 +149,14 @@ func (h *Handler) handlePayload(p Payload) {
 	raw := redis.NewArrayCommand(p.command)
 	_, err := h.aofFile.Write(raw.ToBytes())
 	if err != nil {
-		log.Println(err)
+		log.Errorf("aof write command error: %v", err)
 	}
 }
 
 func (h *Handler) loadAof(maxBytes int64) error {
 	file, err := os.Open(h.aofFileName)
 	if err != nil {
-		log.Println(err)
+		log.Errorf("open aof file error: %v", err)
 		return err
 	}
 	defer func(file *os.File) {

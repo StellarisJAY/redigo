@@ -3,11 +3,11 @@ package rdb
 import (
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"redigo/config"
 	"redigo/interface/database"
 	"redigo/rdb/codec"
+	"redigo/util/log"
 	"time"
 )
 
@@ -53,14 +53,14 @@ func Save(db database.DB) error {
 			if expire != nil {
 				ttlErr := encoder.WriteTTL(uint64(expire.UnixMilli()))
 				if ttlErr != nil {
-					log.Println("RDB write key expire time error: ", ttlErr)
+					log.Errorf("RDB write key expire time error: ", ttlErr)
 					return false
 				}
 			}
 			// write key and value
 			kvErr := encoder.WriteKeyValue(key, entry.Data)
 			if kvErr != nil {
-				log.Println("RDB write key value error: ", kvErr)
+				log.Errorf("RDB write key value error: %v", kvErr)
 				return false
 			}
 			return true
@@ -113,7 +113,7 @@ func BGSave(entries [][]*DataEntry) error {
 						// write expire time
 						err := encoder.WriteTTL(uint64(entry.ExpireTime.UnixMilli()))
 						if err != nil {
-							log.Println("rdb write expire time error: ", err)
+							log.Errorf("rdb write expire time error: %v", err)
 							break
 						}
 					}
@@ -121,7 +121,7 @@ func BGSave(entries [][]*DataEntry) error {
 				// write entry's key value
 				err := encoder.WriteKeyValue(entry.Key, entry.Value)
 				if err != nil {
-					log.Println("rdb write key value error: ", err)
+					log.Errorf("rdb write key value error: %v", err)
 					break
 				}
 			}

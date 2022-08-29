@@ -4,13 +4,13 @@
 package tcp
 
 import (
-	"log"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"redigo/interface/database"
+	"redigo/util/log"
 	"sync"
 	"syscall"
 )
@@ -51,7 +51,7 @@ func (s *GoNetServer) Start() error {
 	go func() {
 		// wait for close signal
 		<-s.closeChan
-		log.Println("Shutting down RediGO server...")
+		log.Info("Shutting down RediGO server...")
 		// close database
 		s.db.Close()
 		_ = s.listener.Close()
@@ -73,7 +73,7 @@ func (s *GoNetServer) Start() error {
 		_ = http.ListenAndServe(":8899", nil)
 	}()
 
-	log.Println("Redigo GoNetServer Started, listen:", listener.Addr())
+	log.Info("Redigo GoNetServer Started, listen: %s", listener.Addr().String())
 	// run acceptor
 	err = s.acceptLoop()
 	if err != nil {

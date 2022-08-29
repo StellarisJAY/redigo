@@ -3,9 +3,9 @@ package cluster
 import (
 	"bufio"
 	"context"
-	"log"
 	"net"
 	"redigo/redis"
+	"redigo/util/log"
 	"redigo/util/pool"
 	"sync"
 	"time"
@@ -39,7 +39,7 @@ func NewPeerClient(peerAddr string, maxConns int) *PeerClient {
 func connect(addr string) *PeerConn {
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
-		log.Println("connect to peer server failed: ", err)
+		log.Errorf("connect to peer server failed: %v", err)
 		return nil
 	}
 	return &PeerConn{Conn: conn}
@@ -63,7 +63,7 @@ func (c *PeerConn) sendCommand(ctx context.Context, command redis.Command) *redi
 	parsed, err := redis.Decode(reader)
 	// 网络接收超时或解析发生错误
 	if err != nil {
-		log.Println("parse peer reply error: ", err)
+		log.Errorf("parse peer reply error: %v", err)
 		return redis.NewErrorCommand(redis.ClusterPeerUnreachableError)
 	}
 	return parsed

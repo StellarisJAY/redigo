@@ -2,12 +2,12 @@ package database
 
 import (
 	"errors"
-	"log"
 	"redigo/config"
 	"redigo/datastruct/dict"
 	"redigo/interface/database"
 	"redigo/rdb"
 	"redigo/redis"
+	"redigo/util/log"
 	"redigo/util/timewheel"
 	"time"
 )
@@ -110,7 +110,7 @@ func (db *SingleDB) Expire(key string, ttl time.Duration) {
 			db.data.Remove(key)
 			// add delete key aof
 			db.addAof([][]byte{[]byte("del"), []byte(key)})
-			log.Println("Expired Key removed: ", key)
+			log.Debug("Expired Key removed: %s", key)
 		})
 	}
 }
@@ -128,7 +128,7 @@ func (db *SingleDB) ExpireAt(key string, expire *time.Time) {
 			}
 			db.ttlMap.Remove(key)
 			db.data.Remove(key)
-			log.Println("Expired Key removed: ", key)
+			log.Debug("Expired Key removed: %s", key)
 		})
 	}
 }
@@ -174,7 +174,7 @@ func (db *SingleDB) expireIfNeeded(key string) bool {
 		}
 		// add delete key to aof
 		db.addAof([][]byte{[]byte("del"), []byte(key)})
-		log.Println("Lazy expire key: ", key)
+		log.Debug("Lazy expire key: %s", key)
 		return true
 	}
 	return false
@@ -337,5 +337,5 @@ func (db *SingleDB) onKeyEvict(key string, value interface{}) {
 	db.data.Remove(key)
 	db.ttlMap.Remove(key)
 	db.versionMap.Remove(key)
-	log.Printf("key: %s evicted", key)
+	log.Debug("key: %s evicted", key)
 }

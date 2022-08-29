@@ -1,8 +1,8 @@
 package cluster
 
 import (
-	"log"
 	"redigo/redis"
+	"redigo/util/log"
 )
 
 type CommandHandler func(cluster *Cluster, command redis.Command) *redis.RespCommand
@@ -91,7 +91,7 @@ func normalCommandHandler(cluster *Cluster, command redis.Command) *redis.RespCo
 	if client, ok := cluster.peers[peer]; ok {
 		// 转发命令并等待回复
 		response := client.RelayCommand(command)
-		log.Printf("received command result from peer: %s", peer)
+		log.Debug("received command result from peer: %s", peer)
 		return response
 	}
 	return redis.NewErrorCommand(redis.ClusterPeerNotFoundError)

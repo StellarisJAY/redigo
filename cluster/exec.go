@@ -1,9 +1,9 @@
 package cluster
 
 import (
-	"log"
 	"redigo/redis"
 	"redigo/util/conn"
+	"redigo/util/log"
 )
 
 // execKeys 集群模式下执行keys命令
@@ -24,7 +24,7 @@ func execKeys(cluster *Cluster, command redis.Command) *redis.RespCommand {
 		go func(peer *PeerClient) {
 			reply := peer.RelayCommand(command)
 			replies <- reply.ToBytes()
-			log.Println("received keys reply from peer: ", peer.peerAddr)
+			log.Debug("received keys reply from peer: %s", peer.peerAddr)
 		}(peer)
 	}
 	// 等待每个节点的结果

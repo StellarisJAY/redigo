@@ -9,9 +9,9 @@ import (
 	"fmt"
 	"golang.org/x/sys/unix"
 	"io"
-	"log"
 	"net"
 	"redigo/redis"
+	"redigo/util/log"
 	"runtime"
 	"strconv"
 	"strings"
@@ -157,7 +157,7 @@ func (e *EpollManager) Handle() error {
 			// 通过fd查询到一个连接对象
 			v, ok := e.conns.Load(int(events[i].Fd))
 			if !ok {
-				log.Println("unknown connection fd: ", events[i].Fd)
+				log.Errorf("unknown connection fd: %d", events[i].Fd)
 				continue
 			}
 			conn := v.(*EpollConnection)
@@ -170,7 +170,7 @@ func (e *EpollManager) Handle() error {
 				err := e.onReadEvent(conn)
 				if err != nil {
 					if !errors.Is(err, io.EOF) {
-						log.Println("read error: ", err)
+						log.Errorf("read error: %v", err)
 					}
 					_ = e.CloseConn(conn)
 				}
@@ -181,7 +181,7 @@ func (e *EpollManager) Handle() error {
 					payload := conn.writeBuffer.Next(n)
 					_, err := conn.Write(payload)
 					if err != nil {
-						log.Println("write error: ", err)
+						log.Errorf("write error: %v", err)
 						_ = e.CloseConn(conn)
 						break
 					}
