@@ -27,6 +27,7 @@ type ServerProperties struct {
 	EnableClusterMode bool     `yaml:"enableClusterMode"`
 	Peers             []string `yaml:"peers"`
 	Self              string   `yaml:"self"`
+	DebugMode         bool     `yaml:"debugMode"`
 }
 
 var Properties *ServerProperties
@@ -54,6 +55,7 @@ func init() {
 		Peers:             []string{},
 		EvictPolicy:       EvictAllLRU,
 		Self:              "127.0.0.1:16380",
+		DebugMode:         true,
 	}
 }
 

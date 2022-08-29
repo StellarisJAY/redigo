@@ -2,12 +2,12 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"redigo/cluster"
 	"redigo/config"
 	"redigo/database"
 	"redigo/tcp"
+	"redigo/util/log"
 )
 
 var banner = ` 
@@ -19,10 +19,6 @@ _  _, _//  __/ /_/ / _  / / /_/ / / /_/ /
                                    
                                     v1.0.0`
 
-func init() {
-	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
-}
-
 func main() {
 	fmt.Println(banner)
 	if len(os.Args) > 1 {
@@ -30,10 +26,16 @@ func main() {
 	} else {
 		config.LoadConfigs("./redis.yaml")
 	}
+
+	if config.Properties.DebugMode {
+		log.SetLevel(log.LevelDebug)
+	} else {
+		log.SetLevel(log.LevelError)
+	}
 	db := database.NewMultiDB(config.Properties.Databases, 1024)
 
 	if config.Properties.EnableClusterMode {
-		log.Println("starting Redigo server in cluster mode...")
+		log.Info("starting Redigo server in cluster mode...")
 		peer := cluster.NewCluster(db, config.Properties.Self, config.Properties.Peers)
 		server := tcp.NewServer(config.Properties.Address, peer)
 		err := server.Start()
@@ -41,7 +43,7 @@ func main() {
 			panic(err)
 		}
 	} else {
-		log.Println("starting Redigo server in standalone mode...")
+		log.Info("starting Redigo server in standalone mode...")
 		server := tcp.NewServer(config.Properties.Address, db)
 		err := server.Start()
 		if err != nil {
