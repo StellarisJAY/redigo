@@ -2,10 +2,13 @@ package log
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
 	"os"
+	"runtime"
+	"strings"
 )
 
 const (
@@ -43,7 +46,7 @@ func NewLogger(level int, out io.Writer) *Logger {
 		if i == LevelInfo {
 			l.loggers[i] = log.New(out, prefixs[i], log.LstdFlags)
 		} else {
-			l.loggers[i] = log.New(out, prefixs[i], log.LstdFlags|log.Lshortfile)
+			l.loggers[i] = log.New(out, prefixs[i], log.LstdFlags)
 		}
 	}
 	for ; i <= LevelDebug; i++ {
@@ -52,24 +55,34 @@ func NewLogger(level int, out io.Writer) *Logger {
 	return l
 }
 
+func caller() string {
+	_, file, line, _ := runtime.Caller(2)
+	index := strings.LastIndex(file, "/")
+	return fmt.Sprintf("%s:%d: ", file[index+1:], line)
+}
+
+func (l *Logger) output(level int, caller string, format string, args ...interface{}) {
+	l.loggers[level].Printf(caller+"\033[0m"+format, args...)
+}
+
 func (l *Logger) Info(format string, args ...interface{}) {
-	l.loggers[LevelInfo].Printf("\033[0m"+format, args...)
+	l.output(LevelInfo, caller(), format, args...)
 }
 
 func (l *Logger) Warn(format string, args ...interface{}) {
-	l.loggers[LevelWarn].Printf("\033[0m"+format, args...)
+	l.output(LevelWarn, caller(), format, args...)
 }
 
 func (l *Logger) Error(err error) {
-	l.loggers[LevelError].Printf("\033[0m" + err.Error())
+	l.output(LevelError, caller(), err.Error())
 }
 
 func (l *Logger) Errorf(format string, args ...interface{}) {
-	l.loggers[LevelError].Printf("\033[0m"+format, args...)
+	l.output(LevelError, caller(), format, args...)
 }
 
 func (l *Logger) Debug(format string, args ...interface{}) {
-	l.loggers[LevelDebug].Printf("\033[0m"+format, args...)
+	l.output(LevelDebug, caller(), format, args...)
 }
 
 func (l *Logger) SetOutput(out io.Writer) {
@@ -79,25 +92,44 @@ func (l *Logger) SetOutput(out io.Writer) {
 }
 
 func Info(format string, args ...interface{}) {
-	globalLogger.Info(format, args...)
+	globalLogger.output(LevelInfo, caller(), format, args...)
 }
 
 func Warn(format string, args ...interface{}) {
-	globalLogger.Warn(format, args...)
+	globalLogger.output(LevelWarn, caller(), format, args...)
 }
 
 func Error(err error) {
-	globalLogger.Error(err)
+	globalLogger.output(LevelError, caller(), err.Error())
 }
 
 func Errorf(format string, args ...interface{}) {
-	globalLogger.Errorf(format, args...)
+	globalLogger.output(LevelError, caller(), format, args...)
 }
 
 func Debug(format string, args ...interface{}) {
-	globalLogger.Debug(format, args...)
+	globalLogger.output(LevelDebug, caller(), format, args...)
 }
 
 func SetOutput(out io.Writer) {
 	globalLogger.SetOutput(out)
+}
+
+func (l *Logger) SetLevel(level int) {
+	if level < 0 {
+		panic(errors.New("invalid log level"))
+	}
+	if level > LevelDebug {
+		level = LevelDebug
+	}
+	for i := 0; i <= level; i++ {
+		l.loggers[i].SetOutput(os.Stdout)
+	}
+	for i := level + 1; i <= LevelDebug; i++ {
+		l.loggers[i].SetOutput(ioutil.Discard)
+	}
+}
+
+func SetLevel(level int) {
+	globalLogger.SetLevel(level)
 }
