@@ -27,7 +27,8 @@ func execHSet(db *SingleDB, command redis.Command) *redis.RespCommand {
 	if !ValidateArgCount(command.Name(), len(args)) {
 		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("HSET"))
 	}
-	hash, err := getOrInitHash(db, string(args[0]))
+	key := string(args[0])
+	hash, err := getOrInitHash(db, key)
 	if err != nil {
 		return redis.NewErrorCommand(err)
 	}
@@ -43,6 +44,7 @@ func execHSet(db *SingleDB, command redis.Command) *redis.RespCommand {
 		hash.Put(k, val)
 		i += 2
 	}
+	db.addVersion(key)
 	db.addAof(command.Parts())
 	// return how many key-value pairs has been put
 	return redis.NewNumberCommand(i / 2)
@@ -72,7 +74,8 @@ func execHDel(db *SingleDB, command redis.Command) *redis.RespCommand {
 	if !ValidateArgCount(command.Name(), len(args)) {
 		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("HDEL"))
 	}
-	hash, exists, err := getHash(db, string(args[0]))
+	key := string(args[0])
+	hash, exists, err := getHash(db, key)
 	if err != nil {
 		return redis.NewErrorCommand(err)
 	}
@@ -82,6 +85,7 @@ func execHDel(db *SingleDB, command redis.Command) *redis.RespCommand {
 		for _, del := range delKeys {
 			count += hash.Remove(string(del))
 		}
+		db.addVersion(key)
 		db.addAof(command.Parts())
 		return redis.NewNumberCommand(count)
 	}
@@ -190,12 +194,15 @@ func execHSetNX(db *SingleDB, command redis.Command) *redis.RespCommand {
 	if !ValidateArgCount(command.Name(), len(args)) {
 		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("HSETNX"))
 	}
-	hash, err := getOrInitHash(db, string(args[0]))
+	key := string(args[0])
+	hKey, hVal := string(args[1]), args[2]
+	hash, err := getOrInitHash(db, key)
 	if err != nil {
 		return redis.NewErrorCommand(err)
 	}
-	absent := hash.PutIfAbsent(string(args[1]), args[2])
+	absent := hash.PutIfAbsent(hKey, hVal)
 	if absent == 1 {
+		db.addVersion(key)
 		db.addAof(command.Parts())
 	}
 	return redis.NewNumberCommand(absent)
@@ -206,18 +213,19 @@ func execHIncrBy(db *SingleDB, command redis.Command) *redis.RespCommand {
 	if !ValidateArgCount(command.Name(), len(args)) {
 		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("HINCRBY"))
 	}
+	key, hKey := string(args[0]), string(args[1])
 	// parse delta value
 	delta, err := strconv.Atoi(string(args[2]))
 	if err != nil {
 		return redis.NewErrorCommand(redis.HashValueNotIntegerError)
 	}
 	// get or init a new hash structure
-	hash, err := getOrInitHash(db, string(args[0]))
+	hash, err := getOrInitHash(db, key)
 	if err != nil {
 		return redis.NewErrorCommand(err)
 	}
 
-	val, exists := hash.Get(string(args[1]))
+	val, exists := hash.Get(hKey)
 	var result int
 	if exists {
 		// value type must be integer
@@ -229,7 +237,8 @@ func execHIncrBy(db *SingleDB, command redis.Command) *redis.RespCommand {
 		result = 0
 	}
 	result += delta
-	hash.Put(string(args[1]), []byte(strconv.Itoa(result)))
+	hash.Put(hKey, []byte(strconv.Itoa(result)))
+	db.addVersion(key)
 	db.addAof(command.Parts())
 	return redis.NewNumberCommand(result)
 }

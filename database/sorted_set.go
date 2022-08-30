@@ -54,6 +54,7 @@ func execZAdd(db *SingleDB, command redis.Command) *redis.RespCommand {
 	for _, ele := range elements {
 		result += zs.Add(ele.Member, ele.Score)
 	}
+	db.addVersion(key)
 	db.addAof(command.Parts())
 	return redis.NewNumberCommand(result)
 }
@@ -81,7 +82,8 @@ func execZRem(db *SingleDB, command redis.Command) *redis.RespCommand {
 	if !ValidateArgCount(command.Name(), len(args)) {
 		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("ZREM"))
 	}
-	zs, err := getSortedSet(db, string(args[0]))
+	key := string(args[0])
+	zs, err := getSortedSet(db, key)
 	if err != nil {
 		return redis.NewErrorCommand(err)
 	}
@@ -92,6 +94,7 @@ func execZRem(db *SingleDB, command redis.Command) *redis.RespCommand {
 	for _, member := range args[1:] {
 		result += zs.Remove(string(member))
 	}
+	db.addVersion(key)
 	db.addAof(command.Parts())
 	return redis.NewNumberCommand(result)
 }
@@ -118,6 +121,7 @@ func execPopMax(db *SingleDB, command redis.Command) *redis.RespCommand {
 	if !ValidateArgCount(command.Name(), len(args)) {
 		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("ZPOPMAX"))
 	}
+	key := string(args[0])
 	count := 1
 	if len(args) > 1 {
 		n, err := strconv.Atoi(string(args[1]))
@@ -126,7 +130,7 @@ func execPopMax(db *SingleDB, command redis.Command) *redis.RespCommand {
 		}
 		count = n
 	}
-	zs, err := getSortedSet(db, string(args[0]))
+	zs, err := getSortedSet(db, key)
 	if err != nil {
 		return redis.NewErrorCommand(err)
 	}
@@ -143,6 +147,7 @@ func execPopMax(db *SingleDB, command redis.Command) *redis.RespCommand {
 				j += 2
 			}
 		}
+		db.addVersion(key)
 		db.addAof(command.Parts())
 		return redis.NewStringArrayCommand(result)
 	}
@@ -154,6 +159,7 @@ func execPopMin(db *SingleDB, command redis.Command) *redis.RespCommand {
 	if !ValidateArgCount(command.Name(), len(args)) {
 		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("ZPOPMIN"))
 	}
+	key := string(args[0])
 	count := 1
 	if len(args) > 1 {
 		n, err := strconv.Atoi(string(args[1]))
@@ -162,7 +168,7 @@ func execPopMin(db *SingleDB, command redis.Command) *redis.RespCommand {
 		}
 		count = n
 	}
-	zs, err := getSortedSet(db, string(args[0]))
+	zs, err := getSortedSet(db, key)
 	if err != nil {
 		return redis.NewErrorCommand(err)
 	}
@@ -179,6 +185,7 @@ func execPopMin(db *SingleDB, command redis.Command) *redis.RespCommand {
 				j += 2
 			}
 		}
+		db.addVersion(key)
 		db.addAof(command.Parts())
 		return redis.NewStringArrayCommand(result)
 	}

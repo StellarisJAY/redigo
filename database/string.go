@@ -159,6 +159,7 @@ func executeAppend(db *SingleDB, command redis.Command) *redis.RespCommand {
 		copy(value[len(originalValue):], appendValue)
 		db.updateEntry(entry, value)
 		length = len(value)
+		db.addVersion(key)
 		db.addAof(command.Parts())
 	} else {
 		// key doesn't exist.
@@ -233,6 +234,7 @@ func add(db *SingleDB, key string, delta int) *redis.RespCommand {
 			value := []byte(strconv.Itoa(val))
 			entry.Data = value
 			db.data.Put(key, entry)
+			db.addVersion(key)
 			return redis.NewNumberCommand(val)
 		}
 	} else {
@@ -262,6 +264,7 @@ func execSetBit(db *SingleDB, command redis.Command) *redis.RespCommand {
 	if !ValidateArgCount(command.Name(), len(args)) {
 		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("SETBIT"))
 	}
+	key := string(args[0])
 	// parse offset and bit number
 	offset, err := strconv.ParseInt(string(args[1]), 10, 64)
 	bit, err := strconv.ParseInt(string(args[2]), 10, 8)
@@ -269,7 +272,7 @@ func execSetBit(db *SingleDB, command redis.Command) *redis.RespCommand {
 		return redis.NewErrorCommand(redis.HashValueNotIntegerError)
 	}
 	// get bitmap struct
-	bm, exists, err := getBitMap(db, string(args[0]))
+	bm, exists, err := getBitMap(db, key)
 	if err != nil {
 		return redis.NewErrorCommand(err)
 	}
@@ -279,6 +282,7 @@ func execSetBit(db *SingleDB, command redis.Command) *redis.RespCommand {
 		entry := &database.Entry{Data: bm}
 		db.data.Put(string(args[0]), entry)
 	}
+	db.addVersion(key)
 	original := bm.SetBit(offset, byte(bit))
 	db.addAof(command.Parts())
 	return redis.NewNumberCommand(int(original))

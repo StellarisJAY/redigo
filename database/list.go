@@ -24,13 +24,15 @@ func execLPush(db *SingleDB, command redis.Command) *redis.RespCommand {
 	if !ValidateArgCount(command.Name(), len(args)) {
 		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("lpush"))
 	}
-	linkedList, err := getOrInitLinkedList(db, string(args[0]))
+	key := string(args[0])
+	linkedList, err := getOrInitLinkedList(db, key)
 	if err != nil {
 		return redis.NewErrorCommand(err)
 	}
 	for _, arg := range args[1:] {
 		linkedList.AddLeft(arg)
 	}
+	db.addVersion(key)
 	db.addAof(command.Parts())
 	return redis.NewNumberCommand(linkedList.Size())
 }
@@ -40,13 +42,15 @@ func execLPop(db *SingleDB, command redis.Command) *redis.RespCommand {
 	if !ValidateArgCount(command.Name(), len(args)) {
 		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("lpush"))
 	}
-	linkedList, err := getLinkedList(db, string(args[0]))
+	key := string(args[0])
+	linkedList, err := getLinkedList(db, key)
 	if err != nil {
 		return redis.NewErrorCommand(err)
 	}
 	if linkedList != nil {
 		left := linkedList.RemoveLeft()
 		if left != nil {
+			db.addVersion(key)
 			db.addAof(command.Parts())
 			return redis.NewBulkStringCommand(left)
 		} else {
@@ -61,13 +65,15 @@ func execRPush(db *SingleDB, command redis.Command) *redis.RespCommand {
 	if !ValidateArgCount(command.Name(), len(args)) {
 		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("rpush"))
 	}
-	linkedList, err := getOrInitLinkedList(db, string(args[0]))
+	key := string(args[0])
+	linkedList, err := getOrInitLinkedList(db, key)
 	if err != nil {
 		return redis.NewErrorCommand(err)
 	}
 	for _, arg := range args[1:] {
 		linkedList.AddRight(arg)
 	}
+	db.addVersion(key)
 	db.addAof(command.Parts())
 	return redis.NewNumberCommand(linkedList.Size())
 }
@@ -77,7 +83,8 @@ func execRPop(db *SingleDB, command redis.Command) *redis.RespCommand {
 	if !ValidateArgCount(command.Name(), len(args)) {
 		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("rpop"))
 	}
-	linkedList, err := getLinkedList(db, string(args[0]))
+	key := string(args[0])
+	linkedList, err := getLinkedList(db, key)
 	if err != nil {
 		return redis.NewErrorCommand(err)
 	}
@@ -85,6 +92,7 @@ func execRPop(db *SingleDB, command redis.Command) *redis.RespCommand {
 		// pop right element
 		right := linkedList.RemoveRight()
 		if right != nil {
+			db.addVersion(key)
 			db.addAof(command.Parts())
 			return redis.NewBulkStringCommand(right)
 		}
@@ -172,20 +180,23 @@ func execRPopLPush(db *SingleDB, command redis.Command) *redis.RespCommand {
 	if !ValidateArgCount(command.Name(), len(args)) {
 		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("RPopLPush"))
 	}
-	srcList, err1 := getLinkedList(db, string(args[0]))
+	key1, key2 := string(args[0]), string(args[1])
+	srcList, err1 := getLinkedList(db, key1)
 	if err1 != nil {
 		return redis.NewErrorCommand(err1)
 	}
 	if srcList == nil || srcList.Size() == 0 {
 		return redis.NilCommand
 	}
-	destList, err2 := getOrInitLinkedList(db, string(args[1]))
+	destList, err2 := getOrInitLinkedList(db, key2)
 	if err2 != nil {
 		return redis.NewErrorCommand(err2)
 	}
 	// pop src right element, put into dest left
 	element := srcList.RemoveRight()
 	if element != nil {
+		db.addVersion(key1)
+		db.addVersion(key2)
 		db.addAof(command.Parts())
 		destList.AddLeft(element)
 	}

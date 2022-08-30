@@ -29,7 +29,8 @@ func execSAdd(db *SingleDB, command redis.Command) *redis.RespCommand {
 	if !ValidateArgCount(command.Name(), len(args)) {
 		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("SADD"))
 	}
-	s, err := getOrCreateSet(db, string(args[0]))
+	key := string(args[0])
+	s, err := getOrCreateSet(db, key)
 	if err != nil {
 		return redis.NewErrorCommand(err)
 	}
@@ -38,6 +39,7 @@ func execSAdd(db *SingleDB, command redis.Command) *redis.RespCommand {
 	for _, val := range vals {
 		count += s.Add(string(val))
 	}
+	db.addVersion(key)
 	db.addAof(command.Parts())
 	return redis.NewNumberCommand(count)
 }
@@ -97,7 +99,8 @@ func execSRem(db *SingleDB, command redis.Command) *redis.RespCommand {
 	if !ValidateArgCount(command.Name(), len(args)) {
 		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("LREM"))
 	}
-	s, err := getSet(db, string(args[0]))
+	key := string(args[0])
+	s, err := getSet(db, key)
 	if err != nil {
 		return redis.NewErrorCommand(err)
 	}
@@ -108,6 +111,7 @@ func execSRem(db *SingleDB, command redis.Command) *redis.RespCommand {
 			count += s.Remove(string(value))
 		}
 		db.addAof(command.Parts())
+		db.addVersion(key)
 		return redis.NewNumberCommand(count)
 	}
 	return redis.NewNumberCommand(0)
@@ -118,12 +122,13 @@ func execSPop(db *SingleDB, command redis.Command) *redis.RespCommand {
 	if !ValidateArgCount(command.Name(), len(args)) {
 		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("SPOP"))
 	}
+	key := string(args[0])
 	// parse pop count, check if is integer
 	count, err := strconv.Atoi(string(args[1]))
 	if err != nil {
 		return redis.NewErrorCommand(redis.HashValueNotIntegerError)
 	}
-	s, err := getSet(db, string(args[0]))
+	s, err := getSet(db, key)
 	if err != nil {
 		return redis.NewErrorCommand(err)
 	}
@@ -141,6 +146,7 @@ func execSPop(db *SingleDB, command redis.Command) *redis.RespCommand {
 				aofCmdLine[i+2] = []byte(member)
 			}
 		}
+		db.addVersion(key)
 		db.addAof(aofCmdLine)
 		return redis.NewStringArrayCommand(members)
 	}
