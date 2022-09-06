@@ -1,5 +1,7 @@
 package buffer
 
+import "fmt"
+
 type RingBuffer struct {
 	buf    []byte
 	cap    int // cap 是ring buffer底层数组的大小
@@ -8,11 +10,11 @@ type RingBuffer struct {
 	wIdx   int
 }
 
-func NewRingBuffer(size int) *RingBuffer {
-	size = ceilPowerOfTwo(size)
+func NewRingBuffer(cap int) *RingBuffer {
+	cap = ceilPowerOfTwo(cap)
 	return &RingBuffer{
-		buf:    make([]byte, size),
-		cap:    size,
+		buf:    make([]byte, cap),
+		cap:    cap,
 		length: 0,
 		rIdx:   0,
 		wIdx:   0,
@@ -80,6 +82,80 @@ func (r *RingBuffer) Write(bytes []byte) (int, error) {
 	return n, nil
 }
 
+func (r *RingBuffer) ReadUntil(delim byte) ([]byte, error) {
+	var temp []byte
+	for {
+		b, err := r.ReadByte()
+		if err != nil {
+			return nil, fmt.Errorf("delim not in buffer")
+		}
+		temp = append(temp, b)
+		if b == delim {
+			return temp, nil
+		}
+	}
+}
+
+func (r *RingBuffer) Next(n int) ([]byte, error) {
+	bytes := make([]byte, n)
+	_, err := r.Read(bytes)
+	return bytes, err
+}
+
+func (r *RingBuffer) Skip(n int) error {
+	if r.length < n {
+		n = r.length
+	}
+	if r.rIdx < r.wIdx {
+		r.rIdx += n
+	} else {
+		r.rIdx = n - (r.cap - r.rIdx)
+	}
+	r.length -= n
+	return nil
+}
+
+func (r *RingBuffer) ReadByte() (byte, error) {
+	if r.length == 0 {
+		return 0, fmt.Errorf("buffer is empty")
+	}
+	b := r.buf[r.rIdx]
+	r.rIdx++
+	if r.rIdx == r.cap {
+		r.rIdx = 0
+	}
+	r.length--
+	return b, nil
+}
+
+func (r *RingBuffer) WriteString(s string) error {
+	bytes := []byte(s)
+	_, err := r.Write(bytes)
+	return err
+}
+
+func (r *RingBuffer) WriteByte(b byte) error {
+	freeSpace := r.Available()
+	if freeSpace == 0 {
+		r.grow(r.length + 1)
+	}
+	r.buf[r.wIdx] = b
+	r.wIdx++
+	if r.wIdx == r.cap {
+		r.wIdx = 0
+	}
+	r.length++
+	return nil
+}
+
+func (r *RingBuffer) Len() int {
+	return r.length
+}
+
+func (r *RingBuffer) Cap() int {
+	return r.cap
+}
+
 // grow buffer扩容到目标大小
 func (r *RingBuffer) grow(target int) {
 	var newCap int
@@ -135,13 +211,6 @@ func (r *RingBuffer) transfer(newSlice []byte, newSize int) {
 		r.wIdx = n
 		r.rIdx = 0
 	}
-}
-
-func min(x, y int) int {
-	if x < y {
-		return x
-	}
-	return y
 }
 
 // ceilPowerOfTwo 将给定的size规范化到2的幂次
