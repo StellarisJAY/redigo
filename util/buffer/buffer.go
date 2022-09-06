@@ -20,7 +20,7 @@ type Buffer interface {
 	WriteByte(b byte) error
 
 	Len() int
-	Size() int
+	Cap() int
 	// Available get the available space in buffer
 	Available() int
 }
