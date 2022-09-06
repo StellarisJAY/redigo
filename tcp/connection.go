@@ -3,7 +3,6 @@ package tcp
 import (
 	"bufio"
 	"context"
-	"io"
 	"net"
 	"redigo/interface/database"
 	"redigo/redis"
@@ -40,8 +39,9 @@ func NewConnection(conn net.Conn, db database.DB) *Connection {
 }
 
 /*
-	readLoop for a connection
-	Continuously read data from connection and dispatch command to handler
+ReadLoop
+read from a connection
+Continuously read data from connection and dispatch command to handler
 */
 func (c *Connection) ReadLoop() error {
 	reader := bufio.NewReader(c.Conn)
@@ -50,10 +50,7 @@ func (c *Connection) ReadLoop() error {
 		cmd, err := redis.Decode(reader)
 		// push result to connection's write chan
 		if err != nil {
-			// Read failed, connection closed
-			if err == io.EOF {
-				return err
-			}
+			return err
 		} else {
 			cmd.BindConnection(c)
 			c.db.SubmitCommand(cmd)
@@ -62,8 +59,9 @@ func (c *Connection) ReadLoop() error {
 }
 
 /*
-	writeLoop for a connection
-	Poll bytes from write channel and write to remote client
+WriteLoop
+write to a connection
+Poll bytes from write channel and write to remote client
 */
 func (c *Connection) WriteLoop() error {
 	for {
@@ -80,7 +78,7 @@ func (c *Connection) WriteLoop() error {
 }
 
 /*
-	close a connection
+Close connection
 */
 func (c *Connection) Close() {
 	c.active.Store(false)
