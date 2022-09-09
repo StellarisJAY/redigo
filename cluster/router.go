@@ -73,6 +73,8 @@ func init() {
 	router["zrange"] = normalCommandHandler
 	router["zrangebyscore"] = normalCommandHandler
 	router["scard"] = normalCommandHandler
+	// 目前DBSize 只获取当前集群节点的key-value数量
+	router["dbsize"] = executeLocal
 }
 
 // normalCommandHandler 普通命令处理器
@@ -95,4 +97,10 @@ func normalCommandHandler(cluster *Cluster, command redis.Command) *redis.RespCo
 		return response
 	}
 	return redis.NewErrorCommand(redis.ClusterPeerNotFoundError)
+}
+
+// execLocal 本地执行命令
+func executeLocal(cluster *Cluster, command redis.Command) *redis.RespCommand {
+	reply := cluster.multiDB.Execute(command)
+	return reply
 }
