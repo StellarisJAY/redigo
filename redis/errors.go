@@ -26,6 +26,7 @@ var (
 	NoSuchKeyError                   = errors.New("ERR no such key")
 	ClusterPeerNotFoundError         = errors.New("ERR cluster peer not found")
 	ClusterPeerUnreachableError      = errors.New("ERR can't reach cluster peer")
+	MovedError                       = "MOVED %s"
 )
 
 func CreateWrongArgumentNumberError(command string) error {
@@ -34,4 +35,8 @@ func CreateWrongArgumentNumberError(command string) error {
 
 func CreateUnknownCommandError(command string) error {
 	return fmt.Errorf(UnknownCommandError, command)
+}
+
+func CreateMovedError(targetAddr string) error {
+	return fmt.Errorf(MovedError, targetAddr)
 }

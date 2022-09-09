@@ -75,12 +75,42 @@ func init() {
 	router["scard"] = normalCommandHandler
 	// 目前DBSize 只获取当前集群节点的key-value数量
 	router["dbsize"] = executeLocal
+
+	router["multi"] = noKeyCommandHandler
+	router["exec"] = noKeyCommandHandler
+}
+
+func noKeyCommandHandler(cluster *Cluster, command redis.Command) *redis.RespCommand {
+	conn := command.Connection()
+	if cmd := command.Name(); cmd == "multi" {
+		// 不允许出现嵌套的multi命令
+		if conn.IsMulti() {
+			return redis.NewErrorCommand(redis.NestedMultiCallError)
+		}
+		conn.SetMulti(true)
+		return redis.OKCommand
+	} else if cmd == "exec" {
+		if !conn.IsMulti() {
+			return redis.NewErrorCommand(redis.ExecWithoutMultiError)
+		}
+		commands := conn.GetQueuedCommands()
+		conn.SetMulti(false)
+		reply := handleQueuedCommands(cluster, commands)
+		return reply
+	}
+	return redis.NewErrorCommand(redis.CreateUnknownCommandError(command.Name()))
 }
 
 // normalCommandHandler 普通命令处理器
 func normalCommandHandler(cluster *Cluster, command redis.Command) *redis.RespCommand {
 	if len(command.Args()) < 1 {
 		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError(command.Name()))
+	}
+	conn := command.Connection()
+	// 当前已经处于multi状态，新的命令全部加入队列
+	if conn.IsMulti() {
+		conn.EnqueueCommand(command.(*redis.RespCommand))
+		return redis.NewSingleLineCommand([]byte("QUEUED"))
 	}
 	key := string(command.Args()[0])
 	// 通过选择器找到key所在的节点
@@ -103,4 +133,20 @@ func normalCommandHandler(cluster *Cluster, command redis.Command) *redis.RespCo
 func executeLocal(cluster *Cluster, command redis.Command) *redis.RespCommand {
 	reply := cluster.multiDB.Execute(command)
 	return reply
+}
+
+// handleQueuedCommands 集群模式下处理队列中的命令
+func handleQueuedCommands(cluster *Cluster, commands []*redis.RespCommand) *redis.RespCommand {
+	replies := make([][]byte, len(commands))
+	for i, command := range commands {
+		key := string(command.Args()[0])
+		// 只执行集群模式允许且key在本地的命令
+		if peer := cluster.selector.SelectPeer(key); peer == cluster.address && router[command.Name()] != nil {
+			reply := cluster.multiDB.Execute(command)
+			replies[i] = redis.Encode(reply)
+		} else {
+			replies[i] = redis.Encode(redis.NewErrorCommand(redis.CreateMovedError(peer)))
+		}
+	}
+	return redis.NewNestedArrayCommand(replies)
 }
