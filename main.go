@@ -19,6 +19,10 @@ _  _, _//  __/ /_/ / _  / / /_/ / / /_/ /
                                    
                                     v1.0.0`
 
+func init() {
+	log.SetLevel(log.LevelError)
+}
+
 func main() {
 	fmt.Println(banner)
 	if len(os.Args) > 1 {
@@ -35,7 +39,7 @@ func main() {
 	db := database.NewMultiDB(config.Properties.Databases, 1024)
 
 	if config.Properties.EnableClusterMode {
-		log.Info("starting Redigo server in cluster mode...")
+		log.Info("starting Redigo server in cluster mode...\n")
 		peer := cluster.NewCluster(db, config.Properties.Self, config.Properties.Peers)
 		server := tcp.NewServer(config.Properties.Address, peer)
 		err := server.Start()
