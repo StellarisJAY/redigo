@@ -234,3 +234,7 @@ func (r *RingBuffer) Available() int {
 		return r.rIdx - r.wIdx
 	}
 }
+
+func getSlice(n int) []byte {
+	return make([]byte, n)
+}
