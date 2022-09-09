@@ -66,7 +66,7 @@ func Exec(db *MultiDB, conn redis.Connection) *redis.RespCommand {
 	replies := make([][]byte, len(commands))
 	for i, command := range commands {
 		reply := db.executeCommand(command)
-		replies[i] = reply.ToBytes()
+		replies[i] = redis.Encode(reply)
 	}
 	return redis.NewNestedArrayCommand(replies)
 }
