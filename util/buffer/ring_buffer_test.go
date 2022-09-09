@@ -24,7 +24,7 @@ func TestRingBuffer_Write(t *testing.T) {
 func TestRingBuffer_ReadUntil(t *testing.T) {
 	buffer := NewRingBuffer(0)
 	_ = buffer.WriteString("*8\r\n")
-	bytes, err := buffer.ReadUntil('\n')
+	bytes, err := buffer.ReadBytes('\n')
 	if err != nil {
 		t.FailNow()
 	}

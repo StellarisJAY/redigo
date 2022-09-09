@@ -3,8 +3,8 @@ package buffer
 type Buffer interface {
 	// Read from buffer, this method extends io.Reader
 	Read([]byte) (int, error)
-	// ReadUntil read from the current read index until the delim byte
-	ReadUntil(delim byte) ([]byte, error)
+	// ReadBytes read from the current read index until the delim byte
+	ReadBytes(delim byte) ([]byte, error)
 	// Next returns a slice of N bytes starting from current read index
 	Next(n int) ([]byte, error)
 	// Skip n bytes

@@ -1,6 +1,9 @@
 package buffer
 
-import "fmt"
+import (
+	"fmt"
+	"io"
+)
 
 type RingBuffer struct {
 	buf    []byte
@@ -82,12 +85,12 @@ func (r *RingBuffer) Write(bytes []byte) (int, error) {
 	return n, nil
 }
 
-func (r *RingBuffer) ReadUntil(delim byte) ([]byte, error) {
+func (r *RingBuffer) ReadBytes(delim byte) ([]byte, error) {
 	var temp []byte
 	for {
 		b, err := r.ReadByte()
 		if err != nil {
-			return nil, fmt.Errorf("delim not in buffer")
+			return nil, io.EOF
 		}
 		temp = append(temp, b)
 		if b == delim {
