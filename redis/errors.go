@@ -5,6 +5,7 @@ import (
 	"fmt"
 )
 
+// Redis 中的错误声明
 var (
 	WrongArgumentNumberError         = "ERR wrong number of arguments for '%s' command"
 	UnknownCommandError              = "ERR unknown command '%s'"

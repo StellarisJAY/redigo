@@ -12,7 +12,9 @@ type CodecBuffer interface {
 	ReadBytes(delim byte) ([]byte, error)
 }
 
+// Decode 解码Redis网络协议
 func Decode(reader CodecBuffer) (*RespCommand, error) {
+	// 读取一行数据，即读取  ...\r\n
 	msg, ioErr, err := readLine(reader)
 	if ioErr {
 		return nil, io.EOF
@@ -22,22 +24,27 @@ func Decode(reader CodecBuffer) (*RespCommand, error) {
 	}
 	var command *RespCommand
 	fromCluster := false
-	if msg[0] == '!' {
+	// 这里对RESP做了一定的修改，加入了Cluster命令前缀来区分客户端与cluster peer
+	if msg[0] == ClusterPrefix {
 		fromCluster = true
 		msg = msg[1:]
 	}
 	switch msg[0] {
 	case SingleLinePrefix:
+		// 单行命令，即前缀到\r\n之间的内容为一条命令
 		command = NewSingleLineCommand(msg[1 : len(msg)-2])
 	case NumberPrefix:
+		// 数字，字符串表示的十进制数字
 		number, err := strconv.Atoi(string(msg[1 : len(msg)-2]))
 		if err != nil {
 			return nil, HashValueNotIntegerError
 		}
 		command = NewNumberCommand(number)
 	case ErrorPrefix:
+		// 错误，前缀后面是错误信息字符串
 		command = NewErrorCommand(errors.New(string(msg[1 : len(msg)-2])))
 	case BulkPrefix:
+		// 多行字符串，格式：$8\r\nabcdefg\r\n
 		bulk, err := readBulkString(reader, msg)
 		if err != nil {
 			return nil, err
@@ -50,7 +57,7 @@ func Decode(reader CodecBuffer) (*RespCommand, error) {
 		command.SetFromCluster(fromCluster)
 		return command, nil
 	case ArrayPrefix:
-		// get Array size
+		// 字符串数组，前缀：*SIZE\r\n$LEN\r\n...\r\n...\r\n
 		size, err := strconv.Atoi(string(msg[1 : len(msg)-2]))
 		if err != nil {
 			return nil, err
@@ -60,7 +67,6 @@ func Decode(reader CodecBuffer) (*RespCommand, error) {
 			command.SetFromCluster(fromCluster)
 			return command, nil
 		}
-		// parse RESP array
 		if parts, err := readArray(reader, size); err != nil {
 			return nil, err
 		} else {
@@ -73,6 +79,7 @@ func Decode(reader CodecBuffer) (*RespCommand, error) {
 	return command, nil
 }
 
+// Encode 将命令编码成Redis网络协议
 func Encode(command *RespCommand) []byte {
 	switch command.commandType {
 	case CommandTypeNumber:
@@ -112,8 +119,8 @@ func Encode(command *RespCommand) []byte {
 }
 
 /*
-	Read RESP Bulk string
-	${len}\r\n{content}\r\n
+Read RESP Bulk string
+${len}\r\n{content}\r\n
 */
 func readBulkString(reader io.Reader, lengthStr []byte) ([]byte, error) {
 	// parse array length

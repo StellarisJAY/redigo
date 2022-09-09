@@ -5,14 +5,15 @@ import (
 	"strings"
 )
 
+// Command 类型常量
 const (
-	CommandTypeSingleLine byte = iota
-	CommandTypeBulk
-	CommandTypeArray
-	CommandTypeNumber
-	CommandTypeError
-	ReplyTypeNil
-	ReplyEmptyList
+	CommandTypeSingleLine byte = iota // 单行字符串
+	CommandTypeBulk                   // 多行字符串
+	CommandTypeArray                  // 字符串数组
+	CommandTypeNumber                 // 整数
+	CommandTypeError                  // 错误
+	ReplyTypeNil                      // 空返回，Nil
+	ReplyEmptyList                    // 空列表返回
 )
 
 const (
@@ -24,17 +25,22 @@ const (
 	ClusterPrefix    = '!'
 )
 
+// Command Redis命令接口
 type Command interface {
 	Append(part []byte)
 	Len() int
+	//Args 命令的参数，第一个参数为 key
 	Args() [][]byte
 	BindConnection(conn Connection)
+	// Connection 获取发送命令的客户端连接
 	Connection() Connection
+	// Name 命令名称
 	Name() string
 	Parts() [][]byte
 
 	ToBytes() []byte
 	Type() byte
+	// IsFromCluster 命令是否来自集群节点
 	IsFromCluster() bool
 	SetFromCluster(bool)
 }
