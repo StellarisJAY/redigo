@@ -79,10 +79,12 @@ func (e *EpollManager) Listen(address string) error {
 	}
 	var ipAddr [4]byte
 	copy(ipAddr[:], net.ParseIP(parts[0]).To4())
+	// 创建 TCP Socket
 	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_STREAM, syscall.IPPROTO_TCP)
 	if err != nil {
 		return err
 	}
+	// Socket Bind 地址
 	err = syscall.Bind(fd, &syscall.SockaddrInet4{Addr: ipAddr, Port: sockPort})
 	if err != nil {
 		return err
@@ -103,14 +105,17 @@ func (e *EpollManager) Listen(address string) error {
 }
 
 func (e *EpollManager) Accept() error {
+	// Accept连接，获得连接的fd，暂时忽略远程地址
 	nfd, _, err := syscall.Accept(e.sockFd)
 	if err != nil {
 		return err
 	}
+	// 将连接设置为非阻塞模式
 	if err = syscall.SetNonblock(nfd, true); err != nil {
 		return err
 	}
 	e.conns.Store(nfd, NewEpollConnection(nfd, e))
+	// 使用EpollCtl控制连接FD，Epoll订阅Read和Write事件
 	err = syscall.EpollCtl(e.epollFd, syscall.EPOLL_CTL_ADD, nfd, &syscall.EpollEvent{
 		Events: EpollRead | EpollWritable,
 		Fd:     int32(nfd),
@@ -122,6 +127,7 @@ func (e *EpollManager) Accept() error {
 	return nil
 }
 
+// CloseConn 连接关闭事件处理
 func (e *EpollManager) CloseConn(conn *EpollConnection) error {
 	// set conn inactive
 	atomic.StoreUint32(&conn.active, 0)
@@ -135,6 +141,7 @@ func (e *EpollManager) CloseConn(conn *EpollConnection) error {
 	return syscall.Close(conn.fd)
 }
 
+// Handle Epoll 事件循环
 func (e *EpollManager) Handle() error {
 	for {
 		events := make([]syscall.EpollEvent, 1024)
