@@ -72,8 +72,6 @@ func (s *GoNetServer) Start() error {
 	go func() {
 		_ = http.ListenAndServe(":8899", nil)
 	}()
-
-	log.Info("Redigo GoNetServer Started, listen: %s", listener.Addr().String())
 	// run acceptor
 	err = s.acceptLoop()
 	if err != nil {
@@ -84,8 +82,8 @@ func (s *GoNetServer) Start() error {
 }
 
 /*
-	TCP GoNetServer acceptor
-	Accept conns in a loop, make connections and create read/write loop for each connection
+TCP GoNetServer acceptor
+Accept conns in a loop, make connections and create read/write loop for each connection
 */
 func (s *GoNetServer) acceptLoop() error {
 	for {

@@ -5,6 +5,7 @@ import (
 	"redigo/interface/database"
 	"redigo/redis"
 	"redigo/tcp"
+	"redigo/util/log"
 	"time"
 )
 
@@ -46,6 +47,7 @@ func (c *Cluster) Close() {
 }
 
 func (c *Cluster) ExecuteLoop() error {
+	log.Info("redigo cluster server started, listening: %s", c.address)
 	// 集群内部服务器启动，同时触发multiDB的启动
 	return c.server.Start()
 }
