@@ -2,7 +2,6 @@ package cluster
 
 import (
 	"redigo/redis"
-	"redigo/util/log"
 )
 
 type CommandHandler func(cluster *Cluster, command redis.Command) *redis.RespCommand
@@ -76,11 +75,14 @@ func init() {
 	// 目前DBSize 只获取当前集群节点的key-value数量
 	router["dbsize"] = executeLocal
 
-	router["multi"] = noKeyCommandHandler
-	router["exec"] = noKeyCommandHandler
+	router["multi"] = multiHandler
+	router["exec"] = multiHandler
+	router["discard"] = executeLocal
+	router["watch"] = handleWatchOrUnwatch
+	router["unwatch"] = handleWatchOrUnwatch
 }
 
-func noKeyCommandHandler(cluster *Cluster, command redis.Command) *redis.RespCommand {
+func multiHandler(cluster *Cluster, command redis.Command) *redis.RespCommand {
 	conn := command.Connection()
 	if cmd := command.Name(); cmd == "multi" {
 		// 不允许出现嵌套的multi命令
@@ -123,7 +125,6 @@ func normalCommandHandler(cluster *Cluster, command redis.Command) *redis.RespCo
 	if client, ok := cluster.peers[peer]; ok {
 		// 转发命令并等待回复
 		response := client.RelayCommand(command)
-		log.Debug("received command result from peer: %s", peer)
 		return response
 	}
 	return redis.NewErrorCommand(redis.ClusterPeerNotFoundError)
@@ -149,4 +150,14 @@ func handleQueuedCommands(cluster *Cluster, commands []*redis.RespCommand) *redi
 		}
 	}
 	return redis.NewNestedArrayCommand(replies)
+}
+
+func handleWatchOrUnwatch(cluster *Cluster, command redis.Command) *redis.RespCommand {
+	if len(command.Args()) != 1 {
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("watch"))
+	}
+	if addr := cluster.selector.SelectPeer(string(command.Args()[0])); addr != cluster.address {
+		return redis.NewErrorCommand(redis.CreateMovedError(addr))
+	}
+	return executeLocal(cluster, command)
 }
