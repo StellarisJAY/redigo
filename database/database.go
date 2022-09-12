@@ -13,8 +13,8 @@ import (
 )
 
 /*
-	MultiDB multiDB 是DB接口的多数据库实现。
-	提供了Redis中的切换数据库、移动key、持久化等跨数据库命令。
+MultiDB multiDB 是DB接口的多数据库实现。
+提供了Redis中的切换数据库、移动key、持久化等跨数据库命令。
 */
 type MultiDB struct {
 	dbSet      []database.DB                                     // dbSet 数据库集合，默认是16个单独的数据库
@@ -256,6 +256,10 @@ func (m *MultiDB) execWatch(command redis.Command) *redis.RespCommand {
 		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("watch"))
 	}
 	conn := command.Connection()
+	// multi内部不能watch
+	if conn.IsMulti() {
+		return redis.NewErrorCommand(redis.WatchInsideMultiError)
+	}
 	keys := make([]string, len(command.Args()))
 	for i, arg := range command.Args() {
 		keys[i] = string(arg)
