@@ -27,6 +27,7 @@ var (
 	ClusterPeerNotFoundError         = errors.New("ERR cluster peer not found")
 	ClusterPeerUnreachableError      = errors.New("ERR can't reach cluster peer")
 	MovedError                       = "MOVED %s"
+	WatchInsideMultiError            = errors.New("ERR WATCH inside MULTI is not allowed")
 )
 
 func CreateWrongArgumentNumberError(command string) error {
