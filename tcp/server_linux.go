@@ -4,12 +4,13 @@
 package tcp
 
 import (
+	"fmt"
 	"io"
-	"log"
 	"os"
 	"os/signal"
 	"redigo/interface/database"
 	"redigo/redis"
+	"redigo/util/log"
 	"syscall"
 )
 
@@ -47,7 +48,7 @@ func (es *EpollServer) Start() error {
 	go func() {
 		// wait for close signal
 		<-es.closeChan
-		log.Println("Shutting down RediGO server...")
+		log.Info("Shutting down RediGO server...")
 		// close database
 		es.db.Close()
 	}()
@@ -56,7 +57,7 @@ func (es *EpollServer) Start() error {
 		for {
 			err := es.em.Accept()
 			if err != nil {
-				log.Println("accept error: ", err)
+				log.Errorf("accept error: %v", err)
 				close(es.closeChan)
 			}
 		}
@@ -65,7 +66,7 @@ func (es *EpollServer) Start() error {
 	go func() {
 		err := es.em.Handle()
 		if err != nil {
-			log.Println("epoll handler error: ", err)
+			log.Errorf("epoll handler error: %v", err)
 		}
 	}()
 
@@ -89,14 +90,15 @@ func (es *EpollServer) Start() error {
 
 func (es *EpollServer) onReadEvent(conn *EpollConnection) error {
 	// 尽可能一次读取所有可读数据，减少Read系统调用
-	payload, err := io.ReadAll(conn)
-	if err != nil {
-		return err
-	}
-	conn.readBuffer.Write(payload)
+	_, _ = conn.ReadBuffered()
 	command, err := redis.Decode(conn.readBuffer)
 	if err != nil {
-		return err
+		if err != io.EOF {
+			return fmt.Errorf("decode error: %w", err)
+		}
+	}
+	if command == nil {
+		return nil
 	}
 	command.BindConnection(conn)
 	reply := es.db.Execute(command)
