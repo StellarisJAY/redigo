@@ -5,6 +5,7 @@ package tcp
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"golang.org/x/sys/unix"
@@ -142,8 +143,13 @@ func (e *EpollManager) CloseConn(conn *EpollConnection) error {
 }
 
 // Handle Epoll 事件循环
-func (e *EpollManager) Handle() error {
+func (e *EpollManager) Handle(ctx context.Context) error {
 	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+		}
 		events := make([]syscall.EpollEvent, 1024)
 		n, err := EpollWait(e.epollFd, events, e.waitMsec)
 		if err != nil {

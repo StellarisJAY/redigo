@@ -1,9 +1,9 @@
 //go:build linux
-// +build linux
 
 package tcp
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -15,17 +15,15 @@ import (
 )
 
 type EpollServer struct {
-	em        *EpollManager
-	address   string
-	closeChan chan struct{}
-	db        database.DB
+	em      *EpollManager
+	address string
+	db      database.DB
 }
 
 func NewServer(address string, db database.DB) *EpollServer {
 	s := &EpollServer{
-		address:   address,
-		closeChan: make(chan struct{}),
-		db:        db,
+		address: address,
+		db:      db,
 	}
 	return s
 }
@@ -37,17 +35,18 @@ func (es *EpollServer) Start() error {
 	if err != nil {
 		return err
 	}
-
+	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
 		err := es.db.ExecuteLoop()
 		if err != nil {
-			es.closeChan <- struct{}{}
+			// database正常情况不会返回error
+			panic(err)
 		}
 	}()
 
 	go func() {
 		// wait for close signal
-		<-es.closeChan
+		<-ctx.Done()
 		log.Info("Shutting down RediGO server...")
 		// close database
 		es.db.Close()
@@ -55,36 +54,37 @@ func (es *EpollServer) Start() error {
 
 	go func() {
 		for {
+			select {
+			case <-ctx.Done():
+				break
+			default:
+			}
 			err := es.em.Accept()
 			if err != nil {
 				log.Errorf("accept error: %v", err)
-				close(es.closeChan)
+				cancel()
 			}
 		}
 	}()
 
 	go func() {
-		err := es.em.Handle()
+		err := es.em.Handle(ctx)
 		if err != nil {
 			log.Errorf("epoll handler error: %v", err)
 		}
 	}()
 
-	// Read sys calls
+	// listen close signal
 	sigCh := make(chan os.Signal)
 	signal.Notify(sigCh, syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT)
 	go func() {
 		sig := <-sigCh
 		switch sig {
 		case syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT:
-			// send close signal
-			close(es.closeChan)
+			cancel()
 		}
 	}()
-	select {
-	case <-es.closeChan:
-
-	}
+	<-ctx.Done()
 	return nil
 }
 
