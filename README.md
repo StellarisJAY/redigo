@@ -1,6 +1,6 @@
 # RediGO
 
-RediGO是用Go语言实现的Redis服务器。通过该项目学习Redis原理，并实现Redis中的各种数据结构和命令。RediGO沿用了原版Redis的单线程模型，使用单个协程处理命令避免线程安全、死锁等问题。
+RediGO是用Go语言实现的Redis服务器。目前实现了Redis的主要数据结构、网络协议、过期、Multi、发布订阅等功能。
 
 关键功能：
 
@@ -13,10 +13,10 @@ RediGO是用Go语言实现的Redis服务器。通过该项目学习Redis原理�
 - [x] RDB持久化（SAVE和BGSAVE）
 - [x] multi事务功能
 - [x] 发布订阅功能
-- [ ] LRU内存淘汰策略
+- [x] LRU内存淘汰策略
 - [ ] Geo地理位置
 - [ ] 主从、哨兵
-- [ ] 集群模式
+- [x] 集群模式
 
 
 
@@ -50,35 +50,44 @@ RediGO是用Go语言实现的Redis服务器。通过该项目学习Redis原理�
 ./build-windos.bat
 ```
 
-在target目录下（可执行文件目录下）创建redis.conf配置文件
+在target目录下（可执行文件目录下）创建redigo.yaml配置文件
+
+```yaml
+# 端口号
+port: 6381
+# 数据库数量
+databases: 16
+# 是否开启 AOF
+appendOnly: false
+# AOF文件
+aofFileName: appendonly-1.log
+# RDB持久化文件
+dbFileName: dump.rdb
+# 本机的集群地址
+self: 127.0.0.1:16381
+# 对客户端开放的地址
+address: 127.0.0.1:6381
+# 开启集群模式
+enableClusterMode: true
+# 集群中的其他节点
+peers:
+  - 127.0.0.1:16382
+  - 127.0.0.1:16383
+```
+
+运行可执行文件，并指定配置文件位置
 
 ```
-# 端口号（默认6380）
-port 6399
-# 数据库数量（默认16）
-databases 16
-
-# 是否开启AOF持久化（默认关闭）
-appendonly true
-# AOF持久化文件名
-appendfilename appendonly.aof
-# aof fsync策略（暂时不支持Always）
-appendfsync everysec
-
-# RDB持久化文件名
-dbfilename dump.rdb
-
-# 启用过期key定时删除（默认关闭，避免定时任务占用CPU）
-useScheduleExpire true
+./redigo.exe redigo.yaml
 ```
 
-运行target目录下的可执行文件，显示如下信息后可使用Redis客户端访问
 
-![](https://images-1257369645.cos.ap-chengdu.myqcloud.com/redigo/redigo_start.PNG)
 
 ## 性能测试
 
-测试环境（腾讯云轻量级服务器 2核4G）：
+详细结果见 **/docs/benchmark.md**
+
+**测试环境**（腾讯云轻量级服务器 2核4G）：
 
 CPU：Intel(R) Xeon(R) Platinum 8255C CPU @ 2.50GHz
 
