@@ -113,12 +113,16 @@ func (m *MultiDB) Close() {
 		// close aof handler
 		m.aofHandler.Close()
 	}
+	close(m.cmdChan)
 }
 
 // ExecuteLoop of Multi Database
 func (m *MultiDB) ExecuteLoop() error {
 	for {
-		cmd := <-m.cmdChan
+		cmd, ok := <-m.cmdChan
+		if !ok {
+			return nil
+		}
 		// execute command and get a reply if command is not dispatched to single database
 		reply := m.Execute(cmd)
 		if reply != nil {
