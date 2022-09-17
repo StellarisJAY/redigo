@@ -2,7 +2,6 @@ package tcp
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"net"
 	"redigo/interface/database"
@@ -12,7 +11,6 @@ import (
 
 type Connection struct {
 	conn       net.Conn
-	replyChan  chan *redis.RespCommand
 	db         database.DB
 	ctx        context.Context
 	cancel     context.CancelFunc
@@ -27,7 +25,6 @@ func NewConnection(conn net.Conn, db database.DB) *Connection {
 	ctx, cancel := context.WithCancel(context.Background())
 	connect := &Connection{
 		conn:       conn,
-		replyChan:  make(chan *redis.RespCommand, 1024),
 		db:         db,
 		cancel:     cancel,
 		ctx:        ctx,
@@ -65,25 +62,7 @@ write to a connection
 Poll bytes from write channel and write to remote client
 */
 func (c *Connection) WriteLoop() error {
-	for {
-		select {
-		case reply := <-c.replyChan:
-			buffer := bufferPool.Get().(*bytes.Buffer)
-			buffer.Write(redis.Encode(reply))
-			size := len(c.replyChan)
-			for i := 0; i < size; i++ {
-				buffer.Write(redis.Encode(<-c.replyChan))
-			}
-			_, err := c.conn.Write(buffer.Bytes())
-			buffer.Reset()
-			bufferPool.Put(buffer)
-			if err != nil {
-				return err
-			}
-		case <-c.ctx.Done():
-			return nil
-		}
-	}
+	panic("write loop not implemented")
 }
 
 /*
@@ -92,12 +71,12 @@ Close connection
 func (c *Connection) Close() {
 	c.active.Store(false)
 	_ = c.conn.Close()
-	c.replyChan = nil
 	c.cancel()
 }
 
 func (c *Connection) SendCommand(command *redis.RespCommand) {
-	c.replyChan <- command
+	encode := redis.Encode(command)
+	_, _ = c.conn.Write(encode)
 }
 
 func (c *Connection) SelectDB(index int) {
