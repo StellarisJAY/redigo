@@ -10,8 +10,7 @@ import (
 )
 
 type Connection struct {
-	Conn       net.Conn
-	ReplyChan  chan *redis.RespCommand
+	conn       net.Conn
 	db         database.DB
 	ctx        context.Context
 	cancel     context.CancelFunc
@@ -25,8 +24,7 @@ type Connection struct {
 func NewConnection(conn net.Conn, db database.DB) *Connection {
 	ctx, cancel := context.WithCancel(context.Background())
 	connect := &Connection{
-		Conn:       conn,
-		ReplyChan:  make(chan *redis.RespCommand, 1024),
+		conn:       conn,
 		db:         db,
 		cancel:     cancel,
 		ctx:        ctx,
@@ -44,7 +42,7 @@ read from a connection
 Continuously read data from connection and dispatch command to handler
 */
 func (c *Connection) ReadLoop() error {
-	reader := bufio.NewReader(c.Conn)
+	reader := bufio.NewReader(c.conn)
 	for {
 		//parse RESP
 		cmd, err := redis.Decode(reader)
@@ -64,17 +62,7 @@ write to a connection
 Poll bytes from write channel and write to remote client
 */
 func (c *Connection) WriteLoop() error {
-	for {
-		select {
-		case reply := <-c.ReplyChan:
-			_, err := c.Conn.Write(redis.Encode(reply))
-			if err != nil {
-				return err
-			}
-		case <-c.ctx.Done():
-			return nil
-		}
-	}
+	panic("write loop not implemented")
 }
 
 /*
@@ -82,13 +70,13 @@ Close connection
 */
 func (c *Connection) Close() {
 	c.active.Store(false)
-	_ = c.Conn.Close()
-	c.ReplyChan = nil
+	_ = c.conn.Close()
 	c.cancel()
 }
 
 func (c *Connection) SendCommand(command *redis.RespCommand) {
-	c.ReplyChan <- command
+	encode := redis.Encode(command)
+	_, _ = c.conn.Write(encode)
 }
 
 func (c *Connection) SelectDB(index int) {
@@ -144,5 +132,5 @@ func (c *Connection) Active() bool {
 }
 
 func (c *Connection) RemoteAddr() string {
-	return c.Conn.RemoteAddr().String()
+	return c.conn.RemoteAddr().String()
 }

@@ -101,18 +101,7 @@ func (s *GoNetServer) acceptLoop() error {
 			if rErr != nil {
 				connect.Close()
 				s.db.OnConnectionClosed(connect)
-				//log.Println("Connection closed by remote client: ", connect.Conn.RemoteAddr().String())
-			}
-			s.activeConns.Delete(connect)
-		}(connection)
-
-		// start write loop
-		go func(connect *Connection) {
-			wErr := connect.WriteLoop()
-			if wErr != nil {
-				connect.Close()
-				s.db.OnConnectionClosed(connect)
-				//log.Println("Connection closed by remote client: ", connect.Conn.RemoteAddr().String())
+				//log.Println("Connection closed by remote client: ", connect.conn.RemoteAddr().String())
 			}
 			s.activeConns.Delete(connect)
 		}(connection)
