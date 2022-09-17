@@ -3,7 +3,6 @@ package redis
 // Connection Redis 客户端连接接口
 type Connection interface {
 	ReadLoop() error
-	WriteLoop() error
 	Close()
 	SendCommand(command *RespCommand)
 

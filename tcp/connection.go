@@ -2,7 +2,6 @@ package tcp
 
 import (
 	"bufio"
-	"context"
 	"net"
 	"redigo/interface/database"
 	"redigo/redis"
@@ -12,27 +11,21 @@ import (
 type Connection struct {
 	conn       net.Conn
 	db         database.DB
-	ctx        context.Context
-	cancel     context.CancelFunc
 	selectedDB int
 	multi      bool
 	watching   map[string]int64
 	cmdQueue   []*redis.RespCommand
-	active     atomic.Value
+	active     int32
 }
 
 func NewConnection(conn net.Conn, db database.DB) *Connection {
-	ctx, cancel := context.WithCancel(context.Background())
 	connect := &Connection{
 		conn:       conn,
 		db:         db,
-		cancel:     cancel,
-		ctx:        ctx,
 		selectedDB: 0,
 		multi:      false,
-		active:     atomic.Value{},
+		active:     1,
 	}
-	connect.active.Store(true)
 	return connect
 }
 
@@ -46,7 +39,6 @@ func (c *Connection) ReadLoop() error {
 	for {
 		//parse RESP
 		cmd, err := redis.Decode(reader)
-		// push result to connection's write chan
 		if err != nil {
 			return err
 		} else {
@@ -57,21 +49,11 @@ func (c *Connection) ReadLoop() error {
 }
 
 /*
-WriteLoop
-write to a connection
-Poll bytes from write channel and write to remote client
-*/
-func (c *Connection) WriteLoop() error {
-	panic("write loop not implemented")
-}
-
-/*
 Close connection
 */
 func (c *Connection) Close() {
-	c.active.Store(false)
+	atomic.StoreInt32(&c.active, 0)
 	_ = c.conn.Close()
-	c.cancel()
 }
 
 func (c *Connection) SendCommand(command *redis.RespCommand) {
@@ -128,7 +110,7 @@ func (c *Connection) GetWatching() map[string]int64 {
 }
 
 func (c *Connection) Active() bool {
-	return c.active.Load().(bool)
+	return atomic.LoadInt32(&c.active) == 1
 }
 
 func (c *Connection) RemoteAddr() string {

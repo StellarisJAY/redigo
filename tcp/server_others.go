@@ -1,9 +1,9 @@
 //go:build !linux
-// +build !linux
 
 package tcp
 
 import (
+	"context"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
@@ -28,7 +28,6 @@ func NewServer(address string, db database.DB) *GoNetServer {
 		address:     address,
 		activeConns: sync.Map{},
 		listener:    nil,
-		closeChan:   make(chan struct{}),
 		db:          db,
 	}
 }
@@ -39,7 +38,7 @@ func (s *GoNetServer) Start() error {
 		return err
 	}
 	s.listener = listener
-
+	ctx, cancel := context.WithCancel(context.Background())
 	// start database execution loop
 	go func() {
 		execErr := s.db.ExecuteLoop()
@@ -50,21 +49,20 @@ func (s *GoNetServer) Start() error {
 
 	go func() {
 		// wait for close signal
-		<-s.closeChan
+		<-ctx.Done()
 		log.Info("Shutting down RediGO server...")
+		_ = s.listener.Close()
 		// close database
 		s.db.Close()
-		_ = s.listener.Close()
 	}()
-	// Read sys calls
+	// listen close signal
 	sigCh := make(chan os.Signal)
 	signal.Notify(sigCh, syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT)
 	go func() {
 		sig := <-sigCh
 		switch sig {
 		case syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT:
-			// send close signal
-			s.closeChan <- struct{}{}
+			cancel()
 		}
 	}()
 
@@ -72,11 +70,11 @@ func (s *GoNetServer) Start() error {
 	go func() {
 		_ = http.ListenAndServe(":8899", nil)
 	}()
+
 	// run acceptor
-	err = s.acceptLoop()
+	err = s.acceptLoop(ctx)
 	if err != nil {
-		// signal close server
-		s.closeChan <- struct{}{}
+		cancel()
 	}
 	return nil
 }
@@ -85,8 +83,14 @@ func (s *GoNetServer) Start() error {
 TCP GoNetServer acceptor
 Accept conns in a loop, make connections and create read/write loop for each connection
 */
-func (s *GoNetServer) acceptLoop() error {
+func (s *GoNetServer) acceptLoop(ctx context.Context) error {
 	for {
+		select {
+		case <-ctx.Done():
+			_ = s.listener.Close()
+			return nil
+		default:
+		}
 		conn, err := s.listener.Accept()
 		if err != nil {
 			return nil
@@ -101,7 +105,6 @@ func (s *GoNetServer) acceptLoop() error {
 			if rErr != nil {
 				connect.Close()
 				s.db.OnConnectionClosed(connect)
-				//log.Println("Connection closed by remote client: ", connect.conn.RemoteAddr().String())
 			}
 			s.activeConns.Delete(connect)
 		}(connection)
