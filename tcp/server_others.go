@@ -4,6 +4,7 @@ package tcp
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
@@ -15,11 +16,11 @@ import (
 	"syscall"
 )
 
+// GoNetServer 非Linux系统下使用go原生net实现的TCP服务器
 type GoNetServer struct {
 	address     string
 	activeConns sync.Map
 	listener    net.Listener
-	closeChan   chan struct{}
 	db          database.DB
 }
 
@@ -27,7 +28,6 @@ func NewServer(address string, db database.DB) *GoNetServer {
 	return &GoNetServer{
 		address:     address,
 		activeConns: sync.Map{},
-		listener:    nil,
 		db:          db,
 	}
 }
@@ -35,7 +35,7 @@ func NewServer(address string, db database.DB) *GoNetServer {
 func (s *GoNetServer) Start() error {
 	listener, err := net.Listen("tcp", s.address)
 	if err != nil {
-		return err
+		return fmt.Errorf("create listener error: %w", err)
 	}
 	s.listener = listener
 	ctx, cancel := context.WithCancel(context.Background())
@@ -43,17 +43,14 @@ func (s *GoNetServer) Start() error {
 	go func() {
 		execErr := s.db.ExecuteLoop()
 		if execErr != nil {
+			// database 正常情况下不会返回错误
 			panic(err)
 		}
 	}()
-
+	// graceful shutdown
 	go func() {
-		// wait for close signal
 		<-ctx.Done()
-		log.Info("Shutting down RediGO server...")
-		_ = s.listener.Close()
-		// close database
-		s.db.Close()
+		s.shutdown()
 	}()
 	// listen close signal
 	sigCh := make(chan os.Signal)
@@ -66,7 +63,7 @@ func (s *GoNetServer) Start() error {
 		}
 	}()
 
-	// pprof here
+	// pprof
 	go func() {
 		_ = http.ListenAndServe(":8899", nil)
 	}()
@@ -81,7 +78,6 @@ func (s *GoNetServer) Start() error {
 
 /*
 TCP GoNetServer acceptor
-Accept conns in a loop, make connections and create read/write loop for each connection
 */
 func (s *GoNetServer) acceptLoop(ctx context.Context) error {
 	for {
@@ -95,18 +91,25 @@ func (s *GoNetServer) acceptLoop(ctx context.Context) error {
 		if err != nil {
 			return nil
 		}
-		// create connection struct
+		// 创建链接并绑定数据库
 		connection := NewConnection(conn, s.db)
-		// Store active conn
 		s.activeConns.Store(connection, 1)
-		// start read loop
+		// 开启 ReadLoop
 		go func(connect *Connection) {
 			rErr := connect.ReadLoop()
 			if rErr != nil {
 				connect.Close()
+				// 连接关闭回调，数据库在连接关闭时的特殊处理，比如删除连接的订阅
 				s.db.OnConnectionClosed(connect)
 			}
 			s.activeConns.Delete(connect)
 		}(connection)
 	}
+}
+
+func (s *GoNetServer) shutdown() {
+	log.Info("Shutting down RediGO server...")
+	_ = s.listener.Close()
+	// close database
+	s.db.Close()
 }
