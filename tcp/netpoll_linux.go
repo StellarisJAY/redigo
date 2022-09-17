@@ -181,6 +181,10 @@ func (e *EpollManager) Handle() error {
 					}
 					_ = e.CloseConn(conn)
 				}
+				err = syscall.EpollCtl(e.epollFd, syscall.EPOLL_CTL_ADD, int(events[i].Fd), &syscall.EpollEvent{
+					Events: EpollRead | EpollWritable,
+					Fd:     events[i].Fd,
+				})
 			}
 			if events[i].Events&EpollWritable == EpollWritable {
 				// 批量写入数据，减少系统调用次数
@@ -223,6 +227,16 @@ func (c *EpollConnection) Read(payload []byte) (int, error) {
 
 func (c *EpollConnection) Write(payload []byte) (int, error) {
 	return syscall.Write(c.fd, payload)
+}
+
+func (c *EpollConnection) ReadBuffered() (int, error) {
+	buf := bytesPool.Get().([]byte)
+	defer bytesPool.Put(buf)
+	n, err := syscall.Read(c.fd, buf)
+	if err != nil {
+		return 0, err
+	}
+	return c.readBuffer.Write(buf[:n])
 }
 
 func (c *EpollConnection) ReadLoop() error {
