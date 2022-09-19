@@ -63,7 +63,7 @@ Summary:
 200K次请求，100K随机key，测试命令：get,set,lpush,lpop,hset,hget,sadd,zadd,lrange
 
 ```
-redis-benchmark -n 200000 -r 100000 -t set,get,lpush,lpop,hset,sadd,zadd,lrange -p 6381
+redis-benchmark -n 200000 -r 100000 -t set,get,lpush,lpop,hset,sadd,zadd,lrange -q -p 6381
 ```
 
 **Redigo测试结果：**
@@ -100,3 +100,44 @@ LRANGE_500 (first 500 elements): 9917.68 requests per second, p50=2.503 msec
 LRANGE_600 (first 600 elements): 8540.80 requests per second, p50=2.895 msec
 ```
 
+
+
+## Windows
+
+### 测试用例1
+
+200K次请求，100K随机key，测试命令：get,set,lpush,lpop,hset,hget,sadd,zadd,lrange
+
+```
+redis-benchmark -n 200000 -r 100000 -t set,get,lpush,lpop,hset,sadd,zadd,lrange -q -p 6381
+```
+
+**Redigo测试结果：**
+
+```
+SET: 46805.53 requests per second
+GET: 46565.77 requests per second
+LPUSH: 46904.32 requests per second
+LPOP: 47427.08 requests per second
+SADD: 46609.18 requests per second
+HSET: 45787.55 requests per second
+LPUSH (needed to benchmark LRANGE): 46349.94 requests per second
+LRANGE_100 (first 100 elements): 23369.95 requests per second
+LRANGE_300 (first 300 elements): 13029.32 requests per second
+```
+
+**Redis测试结果：**
+
+```
+SET: 54719.56 requests per second
+GET: 54495.91 requests per second
+LPUSH: 50390.52 requests per second
+LPOP: 52260.26 requests per second
+SADD: 53604.93 requests per second
+HSET: 52042.68 requests per second
+LPUSH (needed to benchmark LRANGE): 53777.89 requests per second
+LRANGE_100 (first 100 elements): 27735.40 requests per second
+LRANGE_300 (first 300 elements): 14399.88 requests per second
+```
+
+### 
