@@ -35,7 +35,9 @@ read from a connection
 Continuously read data from connection and dispatch command to handler
 */
 func (c *Connection) ReadLoop() error {
-	reader := bufio.NewReader(c.conn)
+	reader := readerPool.Get().(*bufio.Reader)
+	reader.Reset(c.conn)
+	defer readerPool.Put(reader)
 	for {
 		//parse RESP
 		cmd, err := redis.Decode(reader)
