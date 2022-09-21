@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	EpollRead     = syscall.EPOLLIN | syscall.EPOLLPRI | syscall.EPOLLERR | syscall.EPOLLHUP | unix.EPOLLET | syscall.EPOLLRDHUP
+	EpollRead     = syscall.EPOLLIN | syscall.EPOLLPRI | syscall.EPOLLERR | syscall.EPOLLHUP | syscall.EPOLLRDHUP
 	EpollClose    = syscall.EPOLLIN | syscall.EPOLLHUP
 	EpollWritable = syscall.EPOLLOUT
 )
@@ -179,18 +179,16 @@ func (e *EpollManager) Handle(ctx context.Context) error {
 				if err := e.CloseConn(conn); err != nil {
 					return fmt.Errorf("close conn error: %v", err)
 				}
-			} else if events[i].Events&syscall.EPOLLIN == syscall.EPOLLIN {
+				continue
+			}
+			if events[i].Events&syscall.EPOLLIN == syscall.EPOLLIN {
 				err := e.onReadEvent(conn)
 				if err != nil {
 					if !errors.Is(err, io.EOF) {
 						log.Errorf("read error: %v", err)
+						_ = e.CloseConn(conn)
 					}
-					_ = e.CloseConn(conn)
 				}
-				err = syscall.EpollCtl(e.epollFd, syscall.EPOLL_CTL_ADD, int(events[i].Fd), &syscall.EpollEvent{
-					Events: EpollRead | EpollWritable,
-					Fd:     events[i].Fd,
-				})
 			}
 			if events[i].Events&EpollWritable == EpollWritable {
 				// 批量写入数据，减少系统调用次数
