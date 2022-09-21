@@ -8,7 +8,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"golang.org/x/sys/unix"
 	"io"
 	"net"
 	"redigo/redis"
@@ -117,10 +116,7 @@ func (e *EpollManager) Accept() error {
 	}
 	e.conns.Store(nfd, NewEpollConnection(nfd, e))
 	// 使用EpollCtl控制连接FD，Epoll订阅Read和Write事件
-	err = syscall.EpollCtl(e.epollFd, syscall.EPOLL_CTL_ADD, nfd, &syscall.EpollEvent{
-		Events: EpollRead | EpollWritable,
-		Fd:     int32(nfd),
-	})
+	err = epollCtl(e.epollFd, int32(nfd), syscall.EPOLL_CTL_ADD, EpollRead|EpollWritable)
 	if err != nil {
 		e.conns.Delete(nfd)
 		return err
@@ -151,7 +147,7 @@ func (e *EpollManager) Handle(ctx context.Context) error {
 		default:
 		}
 		events := make([]syscall.EpollEvent, 1024)
-		n, err := EpollWait(e.epollFd, events, e.waitMsec)
+		n, err := epollWait(e.epollFd, events, e.waitMsec)
 		if err != nil {
 			if err.Error() == "interrupted system call" {
 				continue
@@ -206,8 +202,8 @@ func (e *EpollManager) Handle(ctx context.Context) error {
 	}
 }
 
-// EpollWait 封装EpollWait系统调用，使用RawSyscall来避免runtime.
-func EpollWait(epfd int, events []syscall.EpollEvent, msec int) (n int, err error) {
+// epollWait 封装EpollWait系统调用，使用RawSyscall来避免runtime.
+func epollWait(epfd int, events []syscall.EpollEvent, msec int) (n int, err error) {
 	var r0 uintptr
 	var _p0 = unsafe.Pointer(&events[0])
 	if msec == 0 {
@@ -219,6 +215,13 @@ func EpollWait(epfd int, events []syscall.EpollEvent, msec int) (n int, err erro
 		err = nil
 	}
 	return int(r0), err
+}
+
+func epollCtl(epfd int, fd int32, op int, events uint32) error {
+	return syscall.EpollCtl(epfd, op, int(fd), &syscall.EpollEvent{
+		Events: events,
+		Fd:     fd,
+	})
 }
 
 func (e *EpollManager) Close() {
