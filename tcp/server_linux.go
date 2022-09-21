@@ -90,7 +90,12 @@ func (es *EpollServer) Start() error {
 
 func (es *EpollServer) onReadEvent(conn *EpollConnection) error {
 	// 尽可能一次读取所有可读数据，减少Read系统调用
-	_, _ = conn.ReadBuffered()
+	for {
+		n, err := conn.ReadBuffered()
+		if n <= 0 || err == io.EOF || err == syscall.EAGAIN {
+			break
+		}
+	}
 	command, err := redis.Decode(conn.readBuffer)
 	if err != nil {
 		if err != io.EOF {
