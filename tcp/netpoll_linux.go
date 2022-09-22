@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 package tcp
 
@@ -8,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"golang.org/x/sys/unix"
 	"io"
 	"net"
 	"redigo/redis"
@@ -22,7 +22,8 @@ import (
 )
 
 const (
-	EpollRead     = syscall.EPOLLIN | syscall.EPOLLPRI | syscall.EPOLLERR | syscall.EPOLLHUP | syscall.EPOLLRDHUP
+	EpollET       = unix.EPOLLET
+	EpollRead     = syscall.EPOLLIN | syscall.EPOLLPRI | syscall.EPOLLERR | syscall.EPOLLHUP | syscall.EPOLLRDHUP | EpollET
 	EpollClose    = syscall.EPOLLIN | syscall.EPOLLHUP
 	EpollWritable = syscall.EPOLLOUT
 )
@@ -43,6 +44,7 @@ type EpollConnection struct {
 	cmdQueue     []*redis.RespCommand
 	epollManager *EpollManager
 
+	wMutex      *sync.Mutex
 	readBuffer  *bytes.Buffer
 	writeBuffer *bytes.Buffer
 	active      uint32
@@ -63,6 +65,7 @@ func NewEpollConnection(fd int, epollManager *EpollManager) *EpollConnection {
 		writeBuffer:  &bytes.Buffer{},
 		readBuffer:   &bytes.Buffer{},
 		active:       1,
+		wMutex:       &sync.Mutex{},
 	}
 }
 
@@ -116,7 +119,7 @@ func (e *EpollManager) Accept() error {
 	}
 	e.conns.Store(nfd, NewEpollConnection(nfd, e))
 	// 使用EpollCtl控制连接FD，Epoll订阅Read和Write事件
-	err = epollCtl(e.epollFd, int32(nfd), syscall.EPOLL_CTL_ADD, EpollRead|EpollWritable)
+	err = epollCtl(e.epollFd, int32(nfd), syscall.EPOLL_CTL_ADD, EpollRead)
 	if err != nil {
 		e.conns.Delete(nfd)
 		return err
@@ -187,7 +190,7 @@ func (e *EpollManager) Handle(ctx context.Context) error {
 				}
 			}
 			if events[i].Events&EpollWritable == EpollWritable {
-				// 批量写入数据，减少系统调用次数
+				// EpollWritable时清空缓冲区剩余的内容
 				if n := conn.writeBuffer.Len(); n > 0 {
 					payload := conn.writeBuffer.Next(n)
 					_, err := conn.Write(payload)
@@ -260,8 +263,18 @@ func (c *EpollConnection) Close() {
 
 func (c *EpollConnection) SendCommand(command *redis.RespCommand) {
 	payload := redis.Encode(command)
-	// 写入writeBuffer，等待批量写入 连接
-	c.writeBuffer.Write(payload)
+	c.wMutex.Lock()
+	defer c.wMutex.Unlock()
+	if c.writeBuffer.Len() > 0 {
+		c.writeBuffer.Write(payload)
+		return
+	}
+	n, err := c.Write(payload)
+	// 如果write缓冲区满会返回EAGAIN，此时需要等待EPOLLOUT
+	if err != nil && err == syscall.EAGAIN {
+		// 把没有写完的部分写入缓冲区
+		c.writeBuffer.Write(payload[n:])
+	}
 }
 
 func (c *EpollConnection) SelectDB(index int) {
