@@ -2,6 +2,8 @@ package tcp
 
 import (
 	"bufio"
+	"bytes"
+	"context"
 	"net"
 	"redigo/interface/database"
 	"redigo/redis"
@@ -10,21 +12,28 @@ import (
 
 type Connection struct {
 	conn       net.Conn
+	replyChan  chan *redis.RespCommand
 	db         database.DB
 	selectedDB int
 	multi      bool
 	watching   map[string]int64
 	cmdQueue   []*redis.RespCommand
 	active     int32
+	ctx        context.Context
+	cancel     context.CancelFunc
 }
 
 func NewConnection(conn net.Conn, db database.DB) *Connection {
+	ctx, cancelFunc := context.WithCancel(context.Background())
 	connect := &Connection{
 		conn:       conn,
+		replyChan:  make(chan *redis.RespCommand, 64),
 		db:         db,
 		selectedDB: 0,
 		multi:      false,
 		active:     1,
+		ctx:        ctx,
+		cancel:     cancelFunc,
 	}
 	return connect
 }
@@ -51,16 +60,45 @@ func (c *Connection) ReadLoop() error {
 }
 
 /*
+WriteLoop
+write to a connection
+Poll bytes from write channel and write to remote client
+*/
+func (c *Connection) WriteLoop() error {
+	for {
+		select {
+		case reply := <-c.replyChan:
+			buffer := bufferPool.Get().(*bytes.Buffer)
+			buffer.Write(redis.Encode(reply))
+			size := len(c.replyChan)
+			for i := 0; i < size; i++ {
+				buffer.Write(redis.Encode(<-c.replyChan))
+			}
+			_, err := c.conn.Write(buffer.Bytes())
+			buffer.Reset()
+			bufferPool.Put(buffer)
+			if err != nil {
+				return err
+			}
+		case <-c.ctx.Done():
+			return nil
+		}
+	}
+}
+
+/*
 Close connection
 */
 func (c *Connection) Close() {
-	atomic.StoreInt32(&c.active, 0)
-	_ = c.conn.Close()
+	if atomic.CompareAndSwapInt32(&c.active, 1, 0) {
+		c.cancel()
+		_ = c.conn.Close()
+		c.replyChan = nil
+	}
 }
 
 func (c *Connection) SendCommand(command *redis.RespCommand) {
-	encode := redis.Encode(command)
-	_, _ = c.conn.Write(encode)
+	c.replyChan <- command
 }
 
 func (c *Connection) SelectDB(index int) {

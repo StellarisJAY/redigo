@@ -104,6 +104,16 @@ func (s *GoNetServer) acceptLoop(ctx context.Context) error {
 			}
 			s.activeConns.Delete(connect)
 		}(connection)
+
+		// start write loop
+		go func(connect *Connection) {
+			wErr := connect.WriteLoop()
+			if wErr != nil {
+				connect.Close()
+				s.db.OnConnectionClosed(connect)
+			}
+			s.activeConns.Delete(connect)
+		}(connection)
 	}
 }
 
