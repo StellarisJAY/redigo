@@ -9,6 +9,7 @@ import (
 	"redigo/redis"
 	"redigo/util/log"
 	"redigo/util/timewheel"
+	"runtime"
 	"time"
 )
 
@@ -48,8 +49,8 @@ func (db *SingleDB) SubmitCommand(command redis.Command) {
 }
 
 /*
-	Execute a command
-	Finds the executor in executor map, then call execFunc to handle it
+Execute a command
+Finds the executor in executor map, then call execFunc to handle it
 */
 func (db *SingleDB) Execute(command redis.Command) *redis.RespCommand {
 	cmd := command.Name()
@@ -227,6 +228,8 @@ func (db *SingleDB) getVersion(key string) int64 {
 func (db *SingleDB) flushDB(async bool) {
 	if !async {
 		db.data.Clear()
+		db.versionMap.Clear()
+		runtime.GC()
 	} else {
 		// 获取当前存在的所有key
 		keys := db.data.Keys()
