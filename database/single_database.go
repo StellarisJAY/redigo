@@ -189,7 +189,6 @@ func (db *SingleDB) GetEntry(key string) (*database.Entry, bool) {
 	}
 	entry := v.(*database.Entry)
 	// get触发将数据移动到LRU队列尾部
-	//db.lruMoveEntryToTail(entry)
 	db.lru.addAccessHistory(entry, entry.DataSize)
 	return entry, true
 }
@@ -202,7 +201,6 @@ func (db *SingleDB) DeleteEntry(key string) (*database.Entry, bool) {
 		db.data.Remove(key)
 		db.ttlMap.Remove(key)
 		db.versionMap.Remove(key)
-		//db.lruRemoveEntry(entry)
 		db.lru.removeEntry(entry)
 		return entry, true
 	}
@@ -226,20 +224,10 @@ func (db *SingleDB) getVersion(key string) int64 {
 }
 
 func (db *SingleDB) flushDB(async bool) {
-	if !async {
-		db.data.Clear()
-		db.versionMap.Clear()
-		runtime.GC()
-	} else {
-		// 获取当前存在的所有key
-		keys := db.data.Keys()
-		// 开启goroutine删除每一个key
-		go func(keys []string) {
-			for _, key := range keys {
-				db.data.Remove(key)
-			}
-		}(keys)
-	}
+	db.data.Clear()
+	db.versionMap.Clear()
+	db.ttlMap.Clear()
+	runtime.GC()
 }
 
 // Rename key, returns error if key doesn't exist
