@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"redigo/cluster"
 	"redigo/config"
@@ -21,19 +20,6 @@ _  _, _//  __/ /_/ / _  / / /_/ / / /_/ /
 
 func init() {
 	log.SetLevel(log.LevelError)
-	parseConfigs()
-}
-
-func parseConfigs() {
-	configFileName := flag.String("config", "./redis.yaml", "custom config filename")
-	debug := flag.Bool("debug_mode", false, "enable debug mode")
-	flag.Parse()
-	config.LoadConfigs(*configFileName)
-	if *debug {
-		log.SetLevel(log.LevelDebug)
-	} else {
-		log.SetLevel(log.LevelError)
-	}
 }
 
 func main() {
