@@ -5,7 +5,7 @@ aofFileName: appendonly-1.log
 dbFileName: dump.rdb
 self: 127.0.0.1:16381
 address: 127.0.0.1:6381
-enableClusterMode: true
+enableClusterMode: false
 peers:
   - 127.0.0.1:16382
   - 127.0.0.1:16383

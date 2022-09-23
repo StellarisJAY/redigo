@@ -1,0 +1,5 @@
+databases: 16
+appendOnly: false
+aofFileName: appendonly.log
+dbFileName: dump.rdb
+address: 127.0.0.1:6381
