@@ -1,8 +1,8 @@
 package main
 
 import (
+	"flag"
 	"fmt"
-	"os"
 	"redigo/cluster"
 	"redigo/config"
 	"redigo/database"
@@ -21,23 +21,24 @@ _  _, _//  __/ /_/ / _  / / /_/ / / /_/ /
 
 func init() {
 	log.SetLevel(log.LevelError)
+	parseConfigs()
 }
 
-func main() {
-	fmt.Println(banner)
-	if len(os.Args) > 1 {
-		config.LoadConfigs(os.Args[1])
-	} else {
-		config.LoadConfigs("./redis.yaml")
-	}
-
-	if config.Properties.DebugMode {
+func parseConfigs() {
+	configFileName := flag.String("config", "./redis.yaml", "custom config filename")
+	debug := flag.Bool("debug_mode", false, "enable debug mode")
+	flag.Parse()
+	config.LoadConfigs(*configFileName)
+	if *debug {
 		log.SetLevel(log.LevelDebug)
 	} else {
 		log.SetLevel(log.LevelError)
 	}
-	db := database.NewMultiDB(config.Properties.Databases, 1024)
+}
 
+func main() {
+	fmt.Println(banner)
+	db := database.NewMultiDB(config.Properties.Databases, 1024)
 	if config.Properties.EnableClusterMode {
 		log.Info("starting Redigo server in cluster mode...\n")
 		peer := cluster.NewCluster(db, config.Properties.Self, config.Properties.Peers)
