@@ -89,11 +89,11 @@ func execDel(db *SingleDB, command redis.Command) *redis.RespCommand {
 		key := string(arg)
 		deleted := db.data.Remove(key)
 		if deleted == 1 {
-			db.CancelTTL(key)
-			db.addAof(command.Parts())
+			db.DeleteEntry(key)
 		}
 		result += deleted
 	}
+	db.addAof(command.Parts())
 	return redis.NewNumberCommand(result)
 }
 
