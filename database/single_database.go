@@ -103,15 +103,7 @@ func (db *SingleDB) Expire(key string, ttl time.Duration) {
 	if config.Properties.UseScheduleExpire {
 		// schedule auto remove in time wheel
 		timewheel.ScheduleDelayed(ttl, "expire_"+key, func() {
-			_, exists := db.ttlMap.Get(key)
-			if !exists {
-				return
-			}
-			db.ttlMap.Remove(key)
-			db.data.Remove(key)
-			// add delete key aof
-			db.addAof([][]byte{[]byte("del"), []byte(key)})
-			log.Debug("Expired Key removed: %s", key)
+			db.SubmitCommand(redis.NewCommand([][]byte{[]byte("del"), []byte(key)}))
 		})
 	}
 }
@@ -123,13 +115,7 @@ func (db *SingleDB) ExpireAt(key string, expire *time.Time) {
 		ttl := expire.Sub(time.Now())
 		// schedule auto remove in time wheel
 		timewheel.ScheduleDelayed(ttl, "expire_"+key, func() {
-			_, exists := db.ttlMap.Get(key)
-			if !exists {
-				return
-			}
-			db.ttlMap.Remove(key)
-			db.data.Remove(key)
-			log.Debug("Expired Key removed: %s", key)
+			db.SubmitCommand(redis.NewCommand([][]byte{[]byte("del"), []byte(key)}))
 		})
 	}
 }
