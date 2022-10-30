@@ -47,12 +47,11 @@ func NewSkipList() *skipList {
 
 func newNode(member string, score float64, levels int) *node {
 	n := &node{
-		Element:  Element{Member: member, Score: score},
-		backward: nil,
-		level:    make([]*Level, levels),
+		Element: Element{Member: member, Score: score},
+		level:   make([]*Level, levels),
 	}
 	for i := 0; i < levels; i++ {
-		n.level[i] = &Level{forward: nil, span: 0}
+		n.level[i] = &Level{}
 	}
 	return n
 }
@@ -150,12 +149,13 @@ func (skl *skipList) Remove(member string, score float64) int {
 		prevNodes[i] = n
 	}
 	n = n.level[0].forward
-	// 如果第0层的下一个节点的score和member与目标相同
-	if n != nil && n.Score == score && n.Member == member {
+	// 如果第0层的下一个节点的member与目标相同
+	if n != nil && n.Member == member {
 		// 删除该节点
 		skl.removeNode(n, prevNodes)
 		return 1
 	}
+	// member不存在，但是外层的map中却存在
 	return 0
 }
 
@@ -304,7 +304,8 @@ func (skl *skipList) RangeByScore(min, max float64, offset, count int, lOpen, rO
 	return result
 }
 
-func (skl *skipList) PrintList() {
+// printLevels of skipList. use in test-cases only
+func (skl *skipList) printLevels() {
 	for i := skl.level - 1; i >= 0; i-- {
 		for n := skl.head; n != nil; n = n.level[i].forward {
 			if n != skl.head {
@@ -320,6 +321,7 @@ func (skl *skipList) PrintList() {
 	}
 }
 
+// forEach iterator
 func (skl *skipList) forEach(fun func(score float64, member string) bool) {
 	n := skl.head.level[0].forward
 	for n != nil {
