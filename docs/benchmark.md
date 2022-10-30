@@ -24,7 +24,7 @@
 1K 连接，500K次请求，100K随机key，get和set命令
 
 ```
-redis-benchmark -c 1000 -n 500000 -r 100000 -t set,get -p 6381
+redis-benchmark -c 1000 -n 500000 -r 100000 -t set,get
 ```
 
 **Redigo 测试结果**
@@ -63,7 +63,7 @@ Summary:
 200K次请求，100K随机key，测试命令：get,set,lpush,lpop,hset,hget,sadd,zadd,lrange
 
 ```
-redis-benchmark -n 200000 -r 100000 -t set,get,lpush,lpop,hset,sadd,zadd,lrange -q -p 6381
+redis-benchmark -n 200000 -r 100000 -t set,get,lpush,lpop,hset,sadd,zadd,lrange -q
 ```
 
 **Redigo测试结果：**
@@ -109,7 +109,7 @@ LRANGE_600 (first 600 elements): 8540.80 requests per second, p50=2.895 msec
 200K次请求，100K随机key，测试命令：get,set,lpush,lpop,hset,hget,sadd,zadd,lrange
 
 ```
-redis-benchmark -n 200000 -r 100000 -t set,get,lpush,lpop,hset,sadd,zadd,lrange -q -p 6381
+redis-benchmark -n 200000 -r 100000 -t set,get,lpush,lpop,hset,sadd,zadd,lrange -q
 ```
 
 **Redigo测试结果：**
