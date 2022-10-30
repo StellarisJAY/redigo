@@ -2,6 +2,7 @@ package zset
 
 import (
 	"fmt"
+	"math/rand"
 	"strconv"
 	"testing"
 )
@@ -104,6 +105,20 @@ func BenchmarkSortedSet_Add(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		set.Add(strconv.Itoa(i), float64(i))
+	}
+}
+
+func BenchmarkSortedSet_Add_Random(b *testing.B) {
+	s := NewSortedSet()
+	scores := make([]float64, b.N)
+	keys := make([]string, b.N)
+	for i := 0; i < b.N; i++ {
+		scores[i] = rand.Float64() * 1000
+		keys[i] = strconv.Itoa(i)
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		s.Add(keys[i], scores[i])
 	}
 }
 
