@@ -28,9 +28,19 @@ func (b *BitMap) SetBit(offset int64, bit byte) byte {
 	slot := getSlot(offset)
 	offset0 := offset % 8
 	b.grow(slot + 1)
-	mask := bit << offset0
 	original := (*b)[slot] >> offset0 & 0x01
-	(*b)[slot] = (*b)[slot] | mask
+	switch bit {
+	case 1:
+		// set 1: slot | 1<<offset
+		var mask byte = 1 << offset0
+		(*b)[slot] = (*b)[slot] | mask
+	case 0:
+		// set 0: slot & (1<<offset) ^ 0xff
+		var mask byte = (1 << offset0) ^ 0xff
+		(*b)[slot] = (*b)[slot] & mask
+	default:
+		panic(fmt.Errorf("bit can only be 1 or 0"))
+	}
 	return original
 }
 
@@ -43,8 +53,8 @@ func (b *BitMap) GetBit(offset int64) byte {
 	return ((*b)[slot] >> offset0) & 0x01
 }
 
-func (b BitMap) BitCount(start, end int64) int64 {
-	length := int64(len(b) * 8)
+func (b *BitMap) BitCount(start, end int64) int64 {
+	length := int64(len(*b) * 8)
 	if start < 0 {
 		start = length + start
 	}
@@ -63,12 +73,12 @@ func (b BitMap) BitCount(start, end int64) int64 {
 	endOff := int(end % 8)
 	var count int64 = 0
 	if startSlot == endSlot {
-		return int64(bitCount(b[startSlot], startOff, endOff))
+		return int64(bitCount((*b)[startSlot], startOff, endOff))
 	}
-	count += int64(bitCount(b[startSlot], startOff, 7))
-	count += int64(bitCount(b[endSlot], 0, endOff))
+	count += int64(bitCount((*b)[startSlot], startOff, 7))
+	count += int64(bitCount((*b)[endSlot], 0, endOff))
 	for i := startSlot + 1; i < endSlot; i++ {
-		count += int64(bitCount(b[i], 0, 0))
+		count += int64(bitCount((*b)[i], 0, 0))
 	}
 
 	return count
