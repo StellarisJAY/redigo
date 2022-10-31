@@ -7,13 +7,28 @@ import (
 
 func TestBitMap_SetBit(t *testing.T) {
 	bitMap := New()
-	var i int64
-	for i = 0; i < 1000; i++ {
-		bitMap.SetBit(i, 1)
-	}
-	if ori := bitMap.SetBit(0, 0); ori != 1 {
-		t.Fail()
-	}
+	t.Run("set-1", func(t *testing.T) {
+		var i int64
+		for i = 0; i < 1000; i++ {
+			bitMap.SetBit(i, 1)
+		}
+		for i = 0; i < 1000; i++ {
+			if b := bitMap.GetBit(i); b != 1 {
+				t.FailNow()
+			}
+		}
+	})
+	t.Run("set-0", func(t *testing.T) {
+		var i int64
+		for i = 0; i < 1000; i++ {
+			bitMap.SetBit(i, 0)
+		}
+		for i = 0; i < 1000; i++ {
+			if b := bitMap.GetBit(i); b != 0 {
+				t.FailNow()
+			}
+		}
+	})
 }
 
 func TestBitMap_SetBit2(t *testing.T) {
