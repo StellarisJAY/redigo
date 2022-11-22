@@ -3,14 +3,15 @@ package geo
 import (
 	"bytes"
 	"errors"
+	"math"
 )
 
 const (
-	MinLatitude float64 = -90
-	MaxLatitude float64 = 90
+	minLatitude float64 = -90
+	maxLatitude float64 = 90
 
-	MinLongitude float64 = -180
-	MaxLongitude float64 = 180
+	minLongitude float64 = -180
+	maxLongitude float64 = 180
 	base32Table          = "0123456789bcdefghjkmnpqrstuvwxyz"
 
 	// 最大精度
@@ -37,8 +38,8 @@ func Encode(latitude, longitude float64, precision int) []byte {
 	if precision > maxPrecision {
 		precision = maxPrecision
 	}
-	latitudes := convert(MinLatitude, MaxLatitude, latitude, precision)
-	longitudes := convert(MinLongitude, MaxLongitude, longitude, precision)
+	latitudes := convert(minLatitude, maxLatitude, latitude, precision)
+	longitudes := convert(minLongitude, maxLongitude, longitude, precision)
 	buffer := &bytes.Buffer{}
 	for i := 0; i < precision; i++ {
 		buffer.WriteByte(longitudes[i])
@@ -68,7 +69,7 @@ func Decode(value []byte) (float64, float64, error) {
 		}
 	}
 	// 转换回坐标值
-	return convertBack(MinLatitude, MaxLatitude, lats, len(lats)), convertBack(MinLongitude, MaxLongitude, lngs, len(lngs)), nil
+	return convertBack(minLatitude, maxLatitude, lats, len(lats)), convertBack(minLongitude, maxLongitude, lngs, len(lngs)), nil
 }
 
 // convert 将坐标值转换成对应精度的geoHash
