@@ -2,6 +2,7 @@ package geo
 
 import (
 	"bytes"
+	"errors"
 )
 
 const (
@@ -20,6 +21,17 @@ const (
 	longitudeUnit float64 = 360.0 / (1 << maxPrecision)
 )
 
+var (
+	ErrInvalidGeoHashValue = errors.New("not a valid base32 value")
+	base32TableReverse     = make(map[byte]byte)
+)
+
+func init() {
+	for i := 0; i < 32; i++ {
+		base32TableReverse[base32Table[i]] = byte(i)
+	}
+}
+
 // Encode 将坐标转换成geoHash
 func Encode(latitude, longitude float64, precision int) []byte {
 	if precision > maxPrecision {
@@ -34,6 +46,29 @@ func Encode(latitude, longitude float64, precision int) []byte {
 	}
 	result := buffer.Bytes()
 	return formatBase32(result)
+}
+
+func Decode(value []byte) (float64, float64, error) {
+	var encoded []byte
+	// base32 转换成 二进制 01数组
+	for _, b := range value {
+		if sum, ok := base32TableReverse[b]; !ok {
+			return 0, 0, ErrInvalidGeoHashValue
+		} else {
+			encoded = append(encoded, numberToBinary(sum)...)
+		}
+	}
+	// 奇偶位分离出经度和纬度
+	var lats, lngs []byte
+	for i := 0; i < len(encoded); i++ {
+		if i&1 == 1 {
+			lats = append(lats, encoded[i])
+		} else {
+			lngs = append(lngs, encoded[i])
+		}
+	}
+	// 转换回坐标值
+	return convertBack(MinLatitude, MaxLatitude, lats, len(lats)), convertBack(MinLongitude, MaxLongitude, lngs, len(lngs)), nil
 }
 
 // convert 将坐标值转换成对应精度的geoHash
@@ -55,6 +90,18 @@ func convert(min, max, value float64, length int) []byte {
 	}
 	converter(min, max, value)
 	return result
+}
+
+func convertBack(min, max float64, value []byte, length int) float64 {
+	for i := 0; i < length; i++ {
+		mid := (min + max) / 2
+		if v := value[i]; v == 0 {
+			max = mid
+		} else {
+			min = mid
+		}
+	}
+	return (min + max) / 2
 }
 
 func formatBase32(value []byte) []byte {
@@ -81,5 +128,16 @@ func Around(latitude, longitude float64) [][]byte {
 	result = append(result, Encode(latitude+latitudeUnit, longitude-longitudeUnit, maxPrecision))
 	result = append(result, Encode(latitude-latitudeUnit, longitude+longitudeUnit, maxPrecision))
 	result = append(result, Encode(latitude-latitudeUnit, longitude-longitudeUnit, maxPrecision))
+	return result
+}
+
+func numberToBinary(num byte) []byte {
+	result := make([]byte, 5)
+	i := 4
+	for num > 0 {
+		result[i] = num & 1
+		num = num >> 1
+		i--
+	}
 	return result
 }
