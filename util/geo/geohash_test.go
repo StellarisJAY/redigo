@@ -1,6 +1,7 @@
 package geo
 
 import (
+	"fmt"
 	"math"
 	"testing"
 )
@@ -13,6 +14,8 @@ func TestEncode(t *testing.T) {
 		expected string
 	}{
 		{"case-1", 31.1932993, 121.4396019, "wtw37q"},
+		{"case-2", -31.191911, -122.345122, "362yxc"},
+		{"case-3", -0.1132445, 10.01234456, "kpzp7g"},
 	}
 	for _, testCase := range testCases {
 		tc := testCase
@@ -20,6 +23,35 @@ func TestEncode(t *testing.T) {
 			if res := string(Encode(tc.lat, tc.lng, 15)); res != tc.expected {
 				t.Logf("result: %s, expected: %s", res, tc.expected)
 				t.Fail()
+			}
+		})
+	}
+}
+
+func TestDecode(t *testing.T) {
+	testCases := []struct {
+		name      string
+		latitude  float64
+		longitude float64
+	}{
+		{"case-1", 31.1932993, 121.4396019},
+		{"case-2", -31.191911, -122.345122},
+		{"case-3", -0.1132445, 10.01234456},
+	}
+	for _, testCase := range testCases {
+		tc := testCase
+		t.Run(tc.name, func(t *testing.T) {
+			encode := Encode(tc.latitude, tc.longitude, 20)
+			lat, lng, err := Decode(encode)
+			if err != nil {
+				t.Error(err)
+				t.FailNow()
+			}
+			if fmt.Sprintf("%.2f", lat) != fmt.Sprintf("%.2f", tc.latitude) {
+				t.Logf("wrong latitude, result: %f, expected: %f", lat, tc.latitude)
+			}
+			if fmt.Sprintf("%.2f", lng) != fmt.Sprintf("%.2f", tc.longitude) {
+				t.Logf("wrong latitude, result: %f, expected: %f", lng, tc.longitude)
 			}
 		})
 	}
