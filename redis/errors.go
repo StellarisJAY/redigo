@@ -28,6 +28,7 @@ var (
 	ClusterPeerUnreachableError      = errors.New("ERR can't reach cluster peer")
 	MovedError                       = "MOVED %s"
 	WatchInsideMultiError            = errors.New("ERR WATCH inside MULTI is not allowed")
+	InvalidCoordinatePairError       = "ERR invalid longitude,latitude pair %.6f,%.6f"
 )
 
 func CreateWrongArgumentNumberError(command string) error {
@@ -40,4 +41,8 @@ func CreateUnknownCommandError(command string) error {
 
 func CreateMovedError(targetAddr string) error {
 	return fmt.Errorf(MovedError, targetAddr)
+}
+
+func CreateInvalidCoordinatePairError(longitude, latitude float64) error {
+	return fmt.Errorf(InvalidCoordinatePairError, longitude, latitude)
 }
