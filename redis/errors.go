@@ -29,6 +29,7 @@ var (
 	MovedError                       = "MOVED %s"
 	WatchInsideMultiError            = errors.New("ERR WATCH inside MULTI is not allowed")
 	InvalidCoordinatePairError       = "ERR invalid longitude,latitude pair %.6f,%.6f"
+	DistanceUnitError                = errors.New("ERR unsupported unit provided. please use m, km, ft, mi")
 )
 
 func CreateWrongArgumentNumberError(command string) error {

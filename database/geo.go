@@ -11,6 +11,7 @@ import (
 func init() {
 	RegisterCommandExecutor("GEOADD", execGeoAdd, -4)
 	RegisterCommandExecutor("GEOPOS", execGeoPos, -2)
+	RegisterCommandExecutor("GEODIST", execGeoDist, -3)
 }
 
 func execGeoAdd(db *SingleDB, command redis.Command) *redis.RespCommand {
@@ -80,4 +81,47 @@ func execGeoPos(db *SingleDB, command redis.Command) *redis.RespCommand {
 		}
 	}
 	return redis.NewNestedArrayCommand(result)
+}
+
+func execGeoDist(db *SingleDB, command redis.Command) *redis.RespCommand {
+	args := command.Args()
+	if !ValidateArgCount(command.Name(), len(args)) || len(args) > 4 {
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("GEODIST"))
+	}
+	key := string(args[0])
+	member1, member2 := string(args[1]), string(args[2])
+	unitOption := "m"
+	if len(args) == 4 {
+		unitOption = string(args[3])
+	}
+	var unitTransfer float64
+	switch unitOption {
+	case "m":
+		unitTransfer = 1
+	case "km":
+		unitTransfer = 0.001
+	case "mi":
+		unitTransfer = 0.00062137
+	case "ft":
+		unitTransfer = 3.2808399
+	default:
+		return redis.NewErrorCommand(redis.DistanceUnitError)
+	}
+	sortedSet, err := getSortedSet(db, key)
+	if err != nil {
+		return redis.NewErrorCommand(err)
+	}
+	if sortedSet == nil {
+		return redis.NilCommand
+	}
+	if element1, ok := sortedSet.GetScore(member1); !ok {
+		return redis.NilCommand
+	} else if element2, ok := sortedSet.GetScore(member2); !ok {
+		return redis.NilCommand
+	} else {
+		lat1, lng1, _ := geo.Decode(geo.FromUint64(uint64(element1.Score)))
+		lat2, lng2, _ := geo.Decode(geo.FromUint64(uint64(element2.Score)))
+		distance := geo.Distance(lat1, lng1, lat2, lng2) * unitTransfer
+		return redis.NewSingleLineCommand([]byte(fmt.Sprintf("%.4f", distance)))
+	}
 }
