@@ -12,6 +12,7 @@ func init() {
 	RegisterCommandExecutor("GEOADD", execGeoAdd, -4)
 	RegisterCommandExecutor("GEOPOS", execGeoPos, -2)
 	RegisterCommandExecutor("GEODIST", execGeoDist, -3)
+	RegisterCommandExecutor("GEOHASH", execGeoHash, -2)
 }
 
 func execGeoAdd(db *SingleDB, command redis.Command) *redis.RespCommand {
@@ -72,6 +73,7 @@ func execGeoPos(db *SingleDB, command redis.Command) *redis.RespCommand {
 		if !ok {
 			result[i] = redis.Encode(redis.NilCommand)
 		} else {
+			// 解码出经纬度，按照数组的形式返回给客户端
 			latitude, longitude, _ := geo.Decode(geo.FromUint64(uint64(element.Score)))
 			reply := redis.NewArrayCommand([][]byte{
 				[]byte(fmt.Sprintf("%.6f", longitude)),
@@ -85,6 +87,7 @@ func execGeoPos(db *SingleDB, command redis.Command) *redis.RespCommand {
 
 func execGeoDist(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
+	// 参数数量最多为4
 	if !ValidateArgCount(command.Name(), len(args)) || len(args) > 4 {
 		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("GEODIST"))
 	}
@@ -94,16 +97,17 @@ func execGeoDist(db *SingleDB, command redis.Command) *redis.RespCommand {
 	if len(args) == 4 {
 		unitOption = string(args[3])
 	}
-	var unitTransfer float64
+	// 单位换算因子
+	var unitFactor float64
 	switch unitOption {
 	case "m":
-		unitTransfer = 1
+		unitFactor = 1
 	case "km":
-		unitTransfer = 0.001
+		unitFactor = 0.001
 	case "mi":
-		unitTransfer = 0.00062137
+		unitFactor = 0.00062137
 	case "ft":
-		unitTransfer = 3.2808399
+		unitFactor = 3.2808399
 	default:
 		return redis.NewErrorCommand(redis.DistanceUnitError)
 	}
@@ -121,7 +125,33 @@ func execGeoDist(db *SingleDB, command redis.Command) *redis.RespCommand {
 	} else {
 		lat1, lng1, _ := geo.Decode(geo.FromUint64(uint64(element1.Score)))
 		lat2, lng2, _ := geo.Decode(geo.FromUint64(uint64(element2.Score)))
-		distance := geo.Distance(lat1, lng1, lat2, lng2) * unitTransfer
+		distance := geo.Distance(lat1, lng1, lat2, lng2) * unitFactor
 		return redis.NewSingleLineCommand([]byte(fmt.Sprintf("%.4f", distance)))
 	}
+}
+
+func execGeoHash(db *SingleDB, command redis.Command) *redis.RespCommand {
+	args := command.Args()
+	if !ValidateArgCount(command.Name(), len(args)) {
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("GEOHASH"))
+	}
+	key := string(args[0])
+	members := args[1:]
+	sortedSet, err := getSortedSet(db, key)
+	if err != nil {
+		return redis.NewErrorCommand(err)
+	}
+	if sortedSet == nil {
+		return redis.NilCommand
+	}
+	result := make([][]byte, len(members))
+	for i, member := range members {
+		if element, ok := sortedSet.GetScore(string(member)); !ok {
+			result[i] = redis.Encode(redis.NilCommand)
+		} else {
+			geoHash := geo.ToString(geo.FromUint64(uint64(element.Score)))
+			result[i] = redis.Encode(redis.NewSingleLineCommand([]byte(geoHash)))
+		}
+	}
+	return redis.NewNestedArrayCommand(result)
 }
