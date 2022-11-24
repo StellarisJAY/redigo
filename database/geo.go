@@ -36,7 +36,7 @@ func execGeoAdd(db *SingleDB, command redis.Command) *redis.RespCommand {
 		if (longitude < -180 || longitude > 180) || (latitude < -90 || latitude > 90) {
 			return redis.NewErrorCommand(redis.CreateInvalidCoordinatePairError(longitude, latitude))
 		}
-		geoHashUint64 := geo.FormatUint64(geo.Encode(latitude, longitude, geo.MaxPrecision))
+		geoHashUint64 := geo.FormatUint64(geo.Encode(latitude, longitude))
 		elements[i] = &zset.Element{
 			Member: string(members[j+2]),
 			Score:  float64(geoHashUint64),
