@@ -20,7 +20,7 @@ func TestEncode(t *testing.T) {
 	for _, testCase := range testCases {
 		tc := testCase
 		t.Run(tc.name, func(t *testing.T) {
-			if res := ToString(Encode(tc.lat, tc.lng)); res != tc.expected {
+			if res := ToString(encode0(tc.lat, tc.lng, MaxPrecision)); res != tc.expected {
 				t.Logf("result: %s, expected: %s", res, tc.expected)
 				t.Fail()
 			}
@@ -41,7 +41,7 @@ func TestDecode(t *testing.T) {
 	for _, testCase := range testCases {
 		tc := testCase
 		t.Run(tc.name, func(t *testing.T) {
-			encode := Encode(tc.latitude, tc.longitude)
+			encode := encode0(tc.latitude, tc.longitude, MaxPrecision)
 			lat, lng, err := Decode(encode)
 			if err != nil {
 				t.Error(err)
@@ -49,9 +49,11 @@ func TestDecode(t *testing.T) {
 			}
 			if fmt.Sprintf("%.2f", lat) != fmt.Sprintf("%.2f", tc.latitude) {
 				t.Logf("wrong latitude, result: %f, expected: %f", lat, tc.latitude)
+				t.Fail()
 			}
 			if fmt.Sprintf("%.2f", lng) != fmt.Sprintf("%.2f", tc.longitude) {
 				t.Logf("wrong latitude, result: %f, expected: %f", lng, tc.longitude)
+				t.Fail()
 			}
 		})
 	}
@@ -124,6 +126,27 @@ func TestFromUint64(t *testing.T) {
 				fmt.Sprintf("%.3f", lng) != fmt.Sprintf("%.3f", tc.longitude) {
 				t.Logf("wrong coordinates, expect: {lat=%f, lng=%f}, got: {lat=%f, lng=%f}", tc.latitude, tc.longitude, lat, lng)
 				t.FailNow()
+			}
+		})
+	}
+}
+
+func TestAroundRadius(t *testing.T) {
+	testCases := []struct {
+		name      string
+		latitude  float64
+		longitude float64
+		radius    float64
+	}{
+		{"case-1", 31.1932993, 121.4396019, 100},
+	}
+	for _, testCase := range testCases {
+		tc := testCase
+		t.Run(tc.name, func(t *testing.T) {
+			members := AroundRadius(tc.latitude, tc.longitude, tc.radius)
+			for _, member := range members {
+				lat, lng, _ := Decode(FromUint64(member[0]))
+				t.Logf("member: %s, uint64: %d, distance: %f", ToString(FromUint64(member[0])), member[0], Distance(tc.latitude, tc.longitude, lat, lng))
 			}
 		})
 	}
