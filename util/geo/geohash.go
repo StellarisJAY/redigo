@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base32"
 	"encoding/binary"
+	"math"
 )
 
 const (
@@ -12,36 +13,28 @@ const (
 
 	minLongitude float64 = -180
 	maxLongitude float64 = 180
-	base32Table          = "0123456789bcdefghjkmnpqrstuvwxyz"
 
 	// MaxPrecision 最大精度
 	MaxPrecision = 32
-	// 纬度的最小单位跨度，即最小精度下的一个geoHash二分的纬度跨度
-	latitudeUnit float64 = 180.0 / (1 << MaxPrecision)
-	// 经度的最小单位跨度
-	longitudeUnit float64 = 360.0 / (1 << MaxPrecision)
 )
 
 var (
-	base32TableReverse = make(map[byte]byte)
-	enc                = base32.NewEncoding("0123456789bcdefghjkmnpqrstuvwxyz").WithPadding(base32.NoPadding)
+	enc = base32.NewEncoding("0123456789bcdefghjkmnpqrstuvwxyz").WithPadding(base32.NoPadding)
 )
-
-func init() {
-	for i := 0; i < 32; i++ {
-		base32TableReverse[base32Table[i]] = byte(i)
-	}
-}
 
 // Encode 将坐标转换成geoHash
 func Encode(latitude, longitude float64) []byte {
-	latitudes := convert(minLatitude, maxLatitude, latitude, MaxPrecision)
-	longitudes := convert(minLongitude, maxLongitude, longitude, MaxPrecision)
+	return encode0(latitude, longitude, MaxPrecision)
+}
+
+func encode0(latitude, longitude float64, precision int) []byte {
+	latitudes := convert(minLatitude, maxLatitude, latitude, precision)
+	longitudes := convert(minLongitude, maxLongitude, longitude, precision)
 	buffer := &bytes.Buffer{}
-	for i := 0; i < MaxPrecision; i += 4 {
+	for i := 0; i < precision; i += 4 {
 		var sum byte = 0
 		k := 0
-		for j := 7; j >= 0; j -= 2 {
+		for j := 7; j >= 0 && i+k < len(latitudes); j -= 2 {
 			sum += longitudes[i+k] * (1 << j)
 			sum += latitudes[i+k] * (1 << (j - 1))
 			k++
@@ -110,14 +103,17 @@ func convertBack(min, max float64, value []byte, length int) float64 {
 	return (min + max) / 2
 }
 
-// Around 坐标所在的geoHash块的周围最小精度范围内的所有块
-func Around(latitude, longitude float64) [][]byte {
+// around 获取坐标所处区块以及周围8个区块，总共9个块，返回geoHash数组
+func around(latitude, longitude float64, latitudeUnit, longitudeUnit float64) [][]byte {
 	var result [][]byte
+	// 坐标所处块
 	result = append(result, Encode(latitude, longitude))
+	// 上下右左
 	result = append(result, Encode(latitude+latitudeUnit, longitude))
 	result = append(result, Encode(latitude-latitudeUnit, longitude))
 	result = append(result, Encode(latitude, longitude+longitudeUnit))
 	result = append(result, Encode(latitude, longitude-longitudeUnit))
+	// 右上，左上，右下，左下
 	result = append(result, Encode(latitude+latitudeUnit, longitude+longitudeUnit))
 	result = append(result, Encode(latitude+latitudeUnit, longitude-longitudeUnit))
 	result = append(result, Encode(latitude-latitudeUnit, longitude+longitudeUnit))
@@ -125,9 +121,43 @@ func Around(latitude, longitude float64) [][]byte {
 	return result
 }
 
-func AroundRadius(latitude, longitude float64, radius float64) [][]byte {
-	//angle := radius / (math.Pi * EarthRadius)
-	return nil
+// AroundRadius 坐标周围一定范围内的所有geoHash块
+func AroundRadius(latitude, longitude float64, radius float64) [][2]uint64 {
+	precision := estimatePrecision(radius, latitude)
+	shift := 1 << precision
+	var latUnit, lngUnit = 180.0 / float64(shift), 360.0 / float64(shift)
+	result := make([][2]uint64, 9)
+	blocks := around(latitude, longitude, latUnit, lngUnit)
+	for i, block := range blocks {
+		result[i] = hashToRange(block, precision)
+	}
+	return result
+}
+
+func hashToRange(geoHash []byte, precision int) [2]uint64 {
+	low := FormatUint64(geoHash)
+	high := low + (1 << ((MaxPrecision - precision) * 2))
+	return [2]uint64{low, high}
+}
+
+// estimatePrecision 通过范围值估计geoHash精度（二分次数）
+func estimatePrecision(radius float64, latitude float64) int {
+	if radius == 0 {
+		return MaxPrecision
+	}
+	precision := 0
+	// 从范围值开始，每次乘二逼近地球赤道长度的一半 (因为precision是二分次数，所以这里使用赤道长度的一半)
+	for radius < EarthRadius*math.Pi {
+		radius = radius * 2
+		precision++
+	}
+	if precision > MaxPrecision {
+		precision = MaxPrecision
+	}
+	if precision < 1 {
+		return 1
+	}
+	return precision
 }
 
 func numberToBinary(num byte) []byte {
