@@ -13,14 +13,14 @@ func TestEncode(t *testing.T) {
 		lng      float64
 		expected string
 	}{
-		{"case-1", 31.1932993, 121.4396019, "wtw37q"},
-		{"case-2", -31.191911, -122.345122, "362yxc"},
-		{"case-3", -0.1132445, 10.01234456, "kpzp7g"},
+		{"case-1", 31.1932993, 121.4396019, "wtw37qtd5u6q2"},
+		{"case-2", -31.191911, -122.345122, "362yxcxjbn2gq"},
+		{"case-3", -0.1132445, 10.01234456, "kpzp7g6u299nn"},
 	}
 	for _, testCase := range testCases {
 		tc := testCase
 		t.Run(tc.name, func(t *testing.T) {
-			if res := ToString(Encode(tc.lat, tc.lng, 15)); res != tc.expected {
+			if res := ToString(Encode(tc.lat, tc.lng)); res != tc.expected {
 				t.Logf("result: %s, expected: %s", res, tc.expected)
 				t.Fail()
 			}
@@ -41,7 +41,7 @@ func TestDecode(t *testing.T) {
 	for _, testCase := range testCases {
 		tc := testCase
 		t.Run(tc.name, func(t *testing.T) {
-			encode := Encode(tc.latitude, tc.longitude, 20)
+			encode := Encode(tc.latitude, tc.longitude)
 			lat, lng, err := Decode(encode)
 			if err != nil {
 				t.Error(err)
@@ -88,14 +88,14 @@ func TestFormatUint64(t *testing.T) {
 		latitude  float64
 		longitude float64
 	}{
-		{"case-1", 2024680306809116940, 31.1932993, 121.4396019},
-		{"case-2", 217863960333589777, -31.191911, -122.345122},
-		{"case-3", 1302981842366826010, -0.1132445, 10.01234456},
+		{"case-1", 16607080642360806753, 31.1932993, 121.4396019},
+		{"case-2", 1839138461212542203, -31.191911, -122.345122},
+		{"case-3", 10772420904271106890, -0.1132445, 10.01234456},
 	}
 	for _, testCase := range testCases {
 		tc := testCase
 		t.Run(tc.name, func(t *testing.T) {
-			if num := FormatUint64(Encode(tc.latitude, tc.longitude, MaxPrecision)); num != tc.expected {
+			if num := FormatUint64(Encode(tc.latitude, tc.longitude)); num != tc.expected {
 				t.Logf("wrong uint64, expected: %d, got: %d", tc.expected, num)
 				t.Fail()
 			}
@@ -110,9 +110,9 @@ func TestFromUint64(t *testing.T) {
 		latitude  float64
 		longitude float64
 	}{
-		{"case-1", 2024680306809116940, 31.1932993, 121.4396019},
-		{"case-2", 217863960333589777, -31.191911, -122.345122},
-		{"case-3", 1302981842366826010, -0.1132445, 10.01234456},
+		{"case-1", 16607080642360806753, 31.1932993, 121.4396019},
+		{"case-2", 1839138461212542203, -31.191911, -122.345122},
+		{"case-3", 10772420904271106890, -0.1132445, 10.01234456},
 	}
 	for _, testCase := range testCases {
 		tc := testCase
