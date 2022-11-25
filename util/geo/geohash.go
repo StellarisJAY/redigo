@@ -123,7 +123,7 @@ func around(latitude, longitude float64, latitudeUnit, longitudeUnit float64) []
 
 // AroundRadius 坐标周围一定范围内的所有geoHash块
 func AroundRadius(latitude, longitude float64, radius float64) [][2]uint64 {
-	precision := estimatePrecision(radius, latitude)
+	precision := estimatePrecision(radius)
 	shift := 1 << precision
 	var latUnit, lngUnit = 180.0 / float64(shift), 360.0 / float64(shift)
 	result := make([][2]uint64, 9)
@@ -141,12 +141,12 @@ func hashToRange(geoHash []byte, precision int) [2]uint64 {
 }
 
 // estimatePrecision 通过范围值估计geoHash精度（二分次数）
-func estimatePrecision(radius float64, latitude float64) int {
+func estimatePrecision(radius float64) int {
 	if radius == 0 {
 		return MaxPrecision
 	}
 	precision := 0
-	// 从范围值开始，每次乘二逼近地球赤道长度的一半 (因为precision是二分次数，所以这里使用赤道长度的一半)
+	// 从范围值开始，每次二乘逼近地球赤道长度的一半 (因为precision是二分次数，所以这里使用赤道长度的一半)
 	for radius < EarthRadius*math.Pi {
 		radius = radius * 2
 		precision++
@@ -158,15 +158,4 @@ func estimatePrecision(radius float64, latitude float64) int {
 		return 1
 	}
 	return precision
-}
-
-func numberToBinary(num byte) []byte {
-	result := make([]byte, 5)
-	i := 4
-	for num > 0 {
-		result[i] = num & 1
-		num = num >> 1
-		i--
-	}
-	return result
 }
