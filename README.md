@@ -13,10 +13,9 @@ RediGO是用Go语言实现的Redis服务器。目前实现了Redis的主要数�
 - [x] RDB持久化（SAVE和BGSAVE）
 - [x] multi事务功能
 - [x] 发布订阅功能
-- [x] LRU内存淘汰策略
-- [ ] Geo地理位置
+- [x] Geo地理位置
 - [ ] 主从、哨兵
-- [x] 集群模式
+- [ ] 集群模式
 
 
 
@@ -30,6 +29,7 @@ RediGO是用Go语言实现的Redis服务器。目前实现了Redis的主要数�
 | set      | SADD, SMEMBERS ,SISMEMBER, SRANDMEMBER, SREM, SPOP, SDIFF, SINTER, SCARD, SDIFFSTORE, SINTERSTORE, SUNION |
 | zset     | ZADD, ZSCORE, ZREM, ZRANK, ZPOPMIN, ZPOPMAX, ZCARD, ZRANGE, ZRANGEBYSCORE |
 | key      | TTL, PTTL, EXPIRE, PERSIST, DEL, EXISTS, TYPE, KEYS, RENAME, RENAMENX, MOVE, RANDOMKEY |
+| Geo      | GEOADD, GEOPOS, GEODIST, GEOHASH, GEORADIUS, GEORADIUSBYMEMBER |
 | 事务     | MULTI, EXEC, DISCARD, WATCH, UNWATCH                         |
 | 发布订阅 | SUBSCRIBE, PUBLISH, PSUBSCRIBE                               |
 | 服务器   | PING                                                         |
