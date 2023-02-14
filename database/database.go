@@ -355,8 +355,5 @@ func (m *MultiDB) execSave(command redis.Command) *redis.RespCommand {
 }
 
 func (m *MultiDB) execBGSave(command redis.Command) *redis.RespCommand {
-	if !m.aofHandler.RewriteStarted.CompareAndSwap(false, true) {
-		return redis.NewErrorCommand(redis.BackgroundSaveInProgressError)
-	}
 	return BGSave(m, command)
 }

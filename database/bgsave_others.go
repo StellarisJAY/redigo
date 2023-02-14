@@ -10,6 +10,9 @@ import (
 
 // 非linux平台使用goroutine加快照的方式bgsave
 func BGSave(db *MultiDB, command redis.Command) *redis.RespCommand {
+	if !db.aofHandler.RewriteStarted.CompareAndSwap(false, true) {
+		return redis.NewErrorCommand(redis.BackgroundSaveInProgressError)
+	}
 	startTime := time.Now()
 	// 复制当前存在的entries
 	snapshot := make([][]*rdb.DataEntry, config.Properties.Databases)
