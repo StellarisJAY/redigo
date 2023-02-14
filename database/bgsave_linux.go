@@ -36,7 +36,11 @@ func BGSave(db *MultiDB, command redis.Command) *redis.RespCommand {
 				if _, err := syscall.Wait4(pid, status, 0, &syscall.Rusage{}); err != nil {
 					log.Errorf("wait bgsave child process error: %w", err)
 				} else {
-					log.Info("bgsave child process exited with code: %d", (*status).ExitStatus())
+					if status != nil {
+						log.Info("bgsave child process exited with code: %d", (*status).ExitStatus())
+					} else {
+						log.Info("bgsave child process exited")
+					}
 				}
 				db.aofHandler.RewriteStarted.Store(false)
 			}()
