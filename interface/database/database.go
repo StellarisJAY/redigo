@@ -22,13 +22,11 @@ type DB interface {
 }
 
 /*
-	Entry key-value数据库entry，包括了key、value属性以及LRU相关的字段
+Entry key-value数据库entry，包括了key、value属性
 */
 type Entry struct {
-	Key          string
-	Data         interface{}
-	NextLRUEntry *Entry
-	PrevLRUEntry *Entry
-	DataSize     int64 // DataSize 数据大小
-	AccessCount  int   // AccessCount LRU-k 访问计数，ac<0表示在frequent队列，ac>=0表示在recent队列
+	Key      string
+	Data     interface{}
+	DataSize int64 // DataSize 数据大小
+	Accessed bool  // 最近是否被访问过
 }

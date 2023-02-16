@@ -19,23 +19,15 @@ type SingleDB struct {
 	idx        int            // idx 该数据库的index
 	addAof     func([][]byte) // addAof 写入AOF的函数，执行命令时通过调用该函数进行AOF持久化
 	versionMap dict.Dict      // versionMap key版本映射，主要用在发布订阅功能上，用来判断key的变化
-	lru        LRU            // lru LRU-K算法实现
 }
 
 func NewSingleDB(idx int) *SingleDB {
-	maxMemory := config.Properties.MaxMemory
 	db := &SingleDB{
 		data:       dict.NewSimpleDict(),
 		ttlMap:     dict.NewSimpleDict(),
 		idx:        idx,
 		versionMap: dict.NewSimpleDict(),
 		addAof:     func(i [][]byte) {},
-	}
-	if maxMemory == -1 {
-		db.lru = &NoLRU{}
-	} else {
-		// todo 最佳的lru-k策略？
-		db.lru = NewTwoQueueLRU(maxMemory, maxMemory/3, 3, db.onKeyEvict)
 	}
 	return db
 }
@@ -44,7 +36,7 @@ func (db *SingleDB) ExecuteLoop() error {
 	panic(errors.New("unsupported operation"))
 }
 
-func (db *SingleDB) SubmitCommand(command redis.Command) {
+func (db *SingleDB) SubmitCommand(_ redis.Command) {
 	panic(errors.New("unsupported operation"))
 }
 
@@ -75,7 +67,7 @@ func (db *SingleDB) Execute(command redis.Command) *redis.RespCommand {
 	}
 }
 
-func (db *SingleDB) ForEach(dbIdx int, fun func(key string, entry *database.Entry, expire *time.Time) bool) {
+func (db *SingleDB) ForEach(_ int, fun func(key string, entry *database.Entry, expire *time.Time) bool) {
 	db.data.ForEach(func(key string, value interface{}) bool {
 		entry := value.(*database.Entry)
 		ttl, ok := db.ttlMap.Get(key)
@@ -87,11 +79,11 @@ func (db *SingleDB) ForEach(dbIdx int, fun func(key string, entry *database.Entr
 	})
 }
 
-func (db *SingleDB) Len(dbIdx int) int {
+func (db *SingleDB) Len(_ int) int {
 	return db.data.Len()
 }
 
-func (db *SingleDB) OnConnectionClosed(conn redis.Connection) {
+func (db *SingleDB) OnConnectionClosed(_ redis.Connection) {
 
 }
 
@@ -174,12 +166,10 @@ func (db *SingleDB) GetEntry(key string) (*database.Entry, bool) {
 		return nil, false
 	}
 	entry := v.(*database.Entry)
-	// get触发将数据移动到LRU队列尾部
-	db.lru.addAccessHistory(entry, entry.DataSize)
 	return entry, true
 }
 
-// DeleteEntry 删除一个key，并将key关联的LRU、TTL删除
+// DeleteEntry 删除一个key，并将key关联的TTL删除
 func (db *SingleDB) DeleteEntry(key string) (*database.Entry, bool) {
 	if entry, ok := db.GetEntry(key); !ok {
 		return nil, false
@@ -187,7 +177,6 @@ func (db *SingleDB) DeleteEntry(key string) (*database.Entry, bool) {
 		db.data.Remove(key)
 		db.ttlMap.Remove(key)
 		db.versionMap.Remove(key)
-		db.lru.removeEntry(entry)
 		return entry, true
 	}
 }
@@ -209,7 +198,7 @@ func (db *SingleDB) getVersion(key string) int64 {
 	return v.(int64)
 }
 
-func (db *SingleDB) flushDB(async bool) {
+func (db *SingleDB) flushDB(_ bool) {
 	db.data.Clear()
 	db.versionMap.Clear()
 	db.ttlMap.Clear()
@@ -265,12 +254,11 @@ func (db *SingleDB) Dump(key string) ([]byte, error) {
 func (db *SingleDB) putEntry(entry *database.Entry) int {
 	result := db.data.Put(entry.Key, entry)
 	if result != 0 {
-		db.lru.addEntry(entry)
 	}
 	return result
 }
 
-// putOrUpdateEntry 添加新的Entry或者更新entry的值，该操作会导致LRU
+// putOrUpdateEntry 添加新的Entry或者更新entry的值
 func (db *SingleDB) putOrUpdateEntry(entry *database.Entry) int {
 	if old, ok := db.data.Get(entry.Key); ok {
 		oldEntry := old.(*database.Entry)
@@ -295,9 +283,7 @@ func (db *SingleDB) putIfExists(key string, value []byte) int {
 		return 0
 	} else if entry, ok := v.(*database.Entry); ok {
 		entry.Data = value
-		oldSize := entry.DataSize
 		entry.DataSize = int64(len(value))
-		db.lru.addAccessHistory(entry, oldSize)
 	}
 	return 0
 }
@@ -305,9 +291,7 @@ func (db *SingleDB) putIfExists(key string, value []byte) int {
 // updateEntry 更新entry中的值，该方法只能由于字符串类型的value
 func (db *SingleDB) updateEntry(entry *database.Entry, value []byte) {
 	entry.Data = value
-	oldSize := entry.DataSize
 	entry.DataSize = int64(len(value))
-	db.lru.addAccessHistory(entry, oldSize)
 }
 
 func (db *SingleDB) onKeyEvict(key string, value interface{}) {
