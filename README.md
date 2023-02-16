@@ -1,12 +1,11 @@
 # RediGO
 
-RediGO是用Go语言实现的Redis服务器。目前实现了Redis的主要数据结构、网络协议、过期、Multi、发布订阅等功能。
+RediGO是用Go语言实现的Redis服务器。目前实现了Redis的主要数据结构、网络协议、expire、Multi、发布订阅等功能。
 
 关键功能：
 
 - [x] 支持string、list、hash、set、sorted_set数据结构的主要命令
 - [x] key过期功能（TTL、EXPIRE），时间轮定时删除策略+惰性删除策略
-- [x] 无阻塞Keys命令
 - [x] Bitmap数据结构
 - [x] AOF持久化（fsync：暂不支持Always）
 - [x] AOF重写（BGRewriteAOF）
@@ -39,18 +38,7 @@ RediGO是用Go语言实现的Redis服务器。目前实现了Redis的主要数�
 
 ## 运行RediGO
 
-### 1. 编译运行
-
-运行编译脚本，获得可执行文件
-
-```shell
-# linux系统
-./build-linux.sh
-# Windows系统
-./build-windos.bat
-```
-
-在target目录下（可执行文件目录下）创建redigo.yaml配置文件
+### 1. 配置文件
 
 ```yaml
 # 端口号
@@ -75,13 +63,42 @@ peers:
   - 127.0.0.1:16383
 ```
 
-运行可执行文件，并指定配置文件位置
+### 2. linux
+
+编译源文件
+
+```shell
+# Makefile编译
+make build ARCH="..." OS="..."
+```
+
+运行target目录下的可执行文件
+
+```shell
+# 运行可执行文件
+./target/redigo --config="配置文件"
+# 或编译 + 运行
+make run CONFIG_FILE="配置文件" ARCH="..." OS="..."
+```
+
+### 3. Windows
+
+Windows版本使用Go推荐的goroutine+channel机制实现服务器，持久化使用goroutine+锁实现，与linux版的epoll和fork实现有区别。推荐使用Linux版本。
+
+运行编译脚本
+
+```shell
+# Windows系统
+./build-windos.bat
+```
+
+运行可执行文件，并指定配置文件位置（可选）
 
 ```
 ./redigo.exe --config redigo.yaml
 ```
 
-### 2. 使用Docker运行
+### 4. 使用Docker运行
 
 从Docker仓库拉取镜像
 
