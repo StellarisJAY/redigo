@@ -5,6 +5,7 @@ import (
 	"redigo/datastruct/bitmap"
 	"redigo/interface/database"
 	"redigo/redis"
+	"redigo/util/str"
 	"strconv"
 	"time"
 )
@@ -37,14 +38,14 @@ func executeSet(db *SingleDB, command redis.Command) *redis.RespCommand {
 	if !ValidateArgCount(command.Name(), len(args)) {
 		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("set"))
 	}
-	key := string(args[0])
+	key := str.BytesToString(args[0])
 	value := args[1]
 	// parse args, determine 'SET' Policy: NX or XX or default
 	policy := defaultPolicy
 	expireTime := infiniteExpireTime
 	var delay time.Duration
 	for i, a := range args {
-		arg := string(a)
+		arg := str.BytesToString(a)
 		if arg == "NX" {
 			policy = insertPolicy
 		} else if arg == "XX" {
@@ -90,7 +91,7 @@ func executeSet(db *SingleDB, command redis.Command) *redis.RespCommand {
 		cancelled := db.CancelTTL(key)
 		if cancelled == 1 {
 			// add PERSIST command to aof
-			db.addAof([][]byte{[]byte("persist"), args[0]})
+			db.addAof([][]byte{str.StringToBytes("persist"), args[0]})
 		}
 	}
 	if result == 0 {
@@ -106,7 +107,7 @@ func executeGet(db *SingleDB, command redis.Command) *redis.RespCommand {
 	if !ValidateArgCount(command.Name(), len(args)) {
 		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("get"))
 	}
-	result, exists, err := getString(db, string(args[0]))
+	result, exists, err := getString(db, str.BytesToString(args[0]))
 	if err != nil {
 		return redis.NewErrorCommand(err)
 	}

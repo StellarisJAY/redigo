@@ -1,6 +1,7 @@
 package redis
 
 import (
+	"redigo/util/str"
 	"strconv"
 	"strings"
 )
@@ -56,10 +57,10 @@ type RespCommand struct {
 }
 
 var (
-	OKCommand        = NewSingleLineCommand([]byte("OK"))
+	OKCommand        = NewSingleLineCommand(str.StringToBytes("OK"))
 	NilCommand       = &RespCommand{commandType: ReplyTypeNil}
 	EmptyListCommand = &RespCommand{commandType: ReplyEmptyList}
-	QueuedCommand    = NewSingleLineCommand([]byte("QUEUED"))
+	QueuedCommand    = NewSingleLineCommand(str.StringToBytes("QUEUED"))
 )
 
 func NewEmptyCommand() *RespCommand {
