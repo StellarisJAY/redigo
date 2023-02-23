@@ -17,10 +17,10 @@ const (
 	LevelError
 	LevelDebug
 
-	PrefixError = "\033[31m[ERROR]\033[0m \u001B[34m"
-	PrefixWarn  = "\033[33m[WARN]\033[0m \u001B[34m"
-	PrefixInfo  = "\033[32m[INFO]\033[0m \u001B[34m"
-	PrefixDebug = "\033[36m[DEBUG]\033[0m \u001B[34m"
+	PrefixError = "[ERROR] "
+	PrefixWarn  = "[WARN]  "
+	PrefixInfo  = "[INFO]  "
+	PrefixDebug = "[DEBUG] "
 )
 
 var (
@@ -62,27 +62,7 @@ func caller() string {
 }
 
 func (l *Logger) output(level int, caller string, format string, args ...interface{}) {
-	l.loggers[level].Printf(caller+"\033[0m"+format, args...)
-}
-
-func (l *Logger) Info(format string, args ...interface{}) {
-	l.output(LevelInfo, caller(), format, args...)
-}
-
-func (l *Logger) Warn(format string, args ...interface{}) {
-	l.output(LevelWarn, caller(), format, args...)
-}
-
-func (l *Logger) Error(err error) {
-	l.output(LevelError, caller(), err.Error())
-}
-
-func (l *Logger) Errorf(format string, args ...interface{}) {
-	l.output(LevelError, caller(), format, args...)
-}
-
-func (l *Logger) Debug(format string, args ...interface{}) {
-	l.output(LevelDebug, caller(), format, args...)
+	l.loggers[level].Printf(caller+format, args...)
 }
 
 func (l *Logger) SetOutput(out io.Writer) {
@@ -92,11 +72,11 @@ func (l *Logger) SetOutput(out io.Writer) {
 }
 
 func Info(format string, args ...interface{}) {
-	globalLogger.output(LevelInfo, caller(), format, args...)
+	globalLogger.output(LevelInfo, "", format, args...)
 }
 
 func Warn(format string, args ...interface{}) {
-	globalLogger.output(LevelWarn, caller(), format, args...)
+	globalLogger.output(LevelWarn, "", format, args...)
 }
 
 func Error(err error) {
