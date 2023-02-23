@@ -7,6 +7,9 @@ import (
 	"redigo/config"
 	"redigo/interface/database"
 	"redigo/rdb/codec"
+	"redigo/redis"
+	"redigo/util/str"
+	"redigo/util/timewheel"
 	"time"
 )
 
@@ -165,4 +168,10 @@ func checkHeader(decoder *codec.Decoder) (bool, bool, error) {
 		}
 	}
 	return true, true, nil
+}
+
+func scheduleSaving(db *MultiDB) {
+	timewheel.ScheduleDelayed(60*time.Second, fmt.Sprintf("save-rdb-%d", time.Now().UnixMilli()), func() {
+		db.SubmitCommand(redis.NewSingleLineCommand(str.StringToBytes("timed-bgsave")))
+	})
 }

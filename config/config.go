@@ -22,6 +22,8 @@ type ServerProperties struct {
 	Peers             []string `yaml:"peers"`
 	Self              string   `yaml:"self"`
 	DebugMode         bool     `yaml:"debugMode"`
+	RdbThreshold      int      `yaml:"rdbThreshold"`
+	RdbTime           int      `yaml:"rdbTime"`
 }
 
 var Properties *ServerProperties
