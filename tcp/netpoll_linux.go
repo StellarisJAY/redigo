@@ -107,11 +107,12 @@ func (e *EpollManager) Accept() error {
 	if err := syscall.SetNonblock(nfd, true); err != nil {
 		return fmt.Errorf("set socket non-block error %w", err)
 	}
+	e.conns.Store(nfd, NewEpollConnection(nfd, e))
 	// epoll ctrl，Read、Write、对端Close事件
 	if err := epollCtl(e.epollFd, int32(nfd), syscall.EPOLL_CTL_ADD, EpollRead|EpollWritable|EpollClose); err != nil {
+		e.conns.Delete(nfd)
 		return err
 	}
-	e.conns.Store(nfd, NewEpollConnection(nfd, e))
 	return nil
 }
 
