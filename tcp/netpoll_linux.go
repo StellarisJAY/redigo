@@ -22,9 +22,8 @@ import (
 )
 
 const (
-	EpollET       = unix.EPOLLET
-	EpollRead     = syscall.EPOLLIN | syscall.EPOLLPRI | syscall.EPOLLERR | syscall.EPOLLHUP | syscall.EPOLLRDHUP | EpollET
-	EpollClose    = syscall.EPOLLIN | syscall.EPOLLHUP
+	EpollRead     = syscall.EPOLLIN | unix.EPOLLET
+	EpollClose    = syscall.EPOLLRDHUP
 	EpollWritable = syscall.EPOLLOUT
 )
 
@@ -70,40 +69,31 @@ func NewEpollConnection(fd int, epollManager *EpollManager) *EpollConnection {
 }
 
 func (e *EpollManager) Listen(address string) error {
-	parts := strings.Split(address, ":")
-	var sockPort int
-	if len(parts) != 2 {
-		return errors.New("invalid address")
+	ipAddr, sockPort, err := parseIPAddr(address)
+	if err != nil {
+		return fmt.Errorf("invalid address format, parse IP Error: %w", err)
 	}
-	if port, err := strconv.Atoi(parts[1]); err != nil {
-		return errors.New("invalid address")
-	} else {
-		sockPort = port
-	}
-	var ipAddr [4]byte
-	copy(ipAddr[:], net.ParseIP(parts[0]).To4())
 	// 创建 TCP Socket
 	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_STREAM, syscall.IPPROTO_TCP)
 	if err != nil {
 		return err
 	}
 	// Socket Bind 地址
-	err = syscall.Bind(fd, &syscall.SockaddrInet4{Addr: ipAddr, Port: sockPort})
-	if err != nil {
-		return err
+	if err := syscall.Bind(fd, &syscall.SockaddrInet4{Addr: ipAddr, Port: sockPort}); err != nil {
+		return fmt.Errorf("bind socket error: %w", err)
+	}
+	// listen
+	if err := syscall.Listen(fd, 128); err != nil {
+		return fmt.Errorf("listen fd error: %w", err)
 	}
 
-	err = syscall.Listen(fd, 10)
-	if err != nil {
-		return err
+	// epoll create
+	if epfd, err := syscall.EpollCreate1(0); err != nil {
+		return fmt.Errorf("epoll create error: %w", err)
+	} else {
+		e.sockFd = fd
+		e.epollFd = epfd
 	}
-
-	epollFd, err := syscall.EpollCreate1(0)
-	if err != nil {
-		return err
-	}
-	e.sockFd = fd
-	e.epollFd = epollFd
 	return nil
 }
 
@@ -111,19 +101,17 @@ func (e *EpollManager) Accept() error {
 	// Accept连接，获得连接的fd，暂时忽略远程地址
 	nfd, _, err := syscall.Accept(e.sockFd)
 	if err != nil {
-		return err
+		return fmt.Errorf("accept conn error %w", err)
 	}
 	// 将连接设置为非阻塞模式
-	if err = syscall.SetNonblock(nfd, true); err != nil {
+	if err := syscall.SetNonblock(nfd, true); err != nil {
+		return fmt.Errorf("set socket non-block error %w", err)
+	}
+	// epoll ctrl，Read、Write、对端Close事件
+	if err := epollCtl(e.epollFd, int32(nfd), syscall.EPOLL_CTL_ADD, EpollRead|EpollWritable|EpollClose); err != nil {
 		return err
 	}
 	e.conns.Store(nfd, NewEpollConnection(nfd, e))
-	// 使用EpollCtl控制连接FD，Epoll订阅Read和Write事件
-	err = epollCtl(e.epollFd, int32(nfd), syscall.EPOLL_CTL_ADD, EpollRead)
-	if err != nil {
-		e.conns.Delete(nfd)
-		return err
-	}
 	return nil
 }
 
@@ -174,12 +162,13 @@ func (e *EpollManager) Handle(ctx context.Context) error {
 			}
 			conn := v.(*EpollConnection)
 			// epoll关闭事件
-			if events[i].Events == uint32(EpollClose) {
+			if events[i].Events&EpollClose == uint32(EpollClose) {
 				if err := e.CloseConn(conn); err != nil {
 					return fmt.Errorf("close conn error: %v", err)
 				}
 				continue
 			}
+			// epoll in
 			if events[i].Events&syscall.EPOLLIN == syscall.EPOLLIN {
 				err := e.onReadEvent(conn)
 				if err != nil {
@@ -189,12 +178,11 @@ func (e *EpollManager) Handle(ctx context.Context) error {
 					}
 				}
 			}
+			// epoll out
 			if events[i].Events&EpollWritable == EpollWritable {
 				// EpollWritable时清空缓冲区剩余的内容
 				if n := conn.writeBuffer.Len(); n > 0 {
-					payload := conn.writeBuffer.Next(n)
-					_, err := conn.Write(payload)
-					if err != nil {
+					if _, err := conn.writeBuffer.WriteTo(conn); err != nil {
 						log.Errorf("write error: %v", err)
 						_ = e.CloseConn(conn)
 						break
@@ -319,4 +307,20 @@ func (c *EpollConnection) Active() bool {
 
 func (c *EpollConnection) RemoteAddr() string {
 	panic("operation not available")
+}
+
+func parseIPAddr(address string) (ipAddr [4]byte, sockPort int, parseErr error) {
+	parts := strings.Split(address, ":")
+	if len(parts) != 2 {
+		parseErr = errors.New("invalid address")
+		return
+	}
+	if port, err := strconv.Atoi(parts[1]); err != nil {
+		parseErr = errors.New("invalid address")
+		return
+	} else {
+		sockPort = port
+	}
+	copy(ipAddr[:], net.ParseIP(parts[0]).To4())
+	return
 }
