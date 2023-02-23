@@ -6,6 +6,8 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"redigo/interface/database"
@@ -52,6 +54,11 @@ func (es *EpollServer) Start() error {
 		es.db.Close()
 	}()
 
+	// pprof
+	go func() {
+		_ = http.ListenAndServe(":8899", nil)
+	}()
+
 	go func() {
 		for {
 			select {
@@ -91,24 +98,23 @@ func (es *EpollServer) Start() error {
 func (es *EpollServer) onReadEvent(conn *EpollConnection) error {
 	// 尽可能一次读取所有可读数据，减少Read系统调用
 	for {
-		n, err := conn.ReadBuffered()
-		if n <= 0 || err == io.EOF || err == syscall.EAGAIN {
+		// socket无数据可读
+		if _, err := conn.ReadBuffered(); err == syscall.EAGAIN {
 			break
 		}
-	}
-	command, err := redis.Decode(conn.readBuffer)
-	if err != nil {
-		if err != io.EOF {
-			return fmt.Errorf("decode error: %w", err)
+		// 将buffer中的数据全部decode，并提交到DB处理
+		for {
+			command, err := redis.Decode(conn.readBuffer)
+			if err != nil && err != io.EOF {
+				return fmt.Errorf("decode error: %w", err)
+			}
+			// buffer中数据不完整
+			if err == io.EOF || command == nil {
+				return nil
+			}
+			command.BindConnection(conn)
+			es.db.SubmitCommand(command)
 		}
-	}
-	if command == nil {
-		return nil
-	}
-	command.BindConnection(conn)
-	reply := es.db.Execute(command)
-	if reply != nil {
-		conn.SendCommand(reply)
 	}
 	return nil
 }
