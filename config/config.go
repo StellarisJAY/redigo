@@ -91,3 +91,13 @@ func loadConfigs(configFilePath string) {
 	defer file.Close()
 	Properties = parseYAML(file)
 }
+
+func DisplayConfigs() {
+	if Properties.AppendOnly {
+		log.Info("append-only enabled, fsync: %s, aof file: %s", Properties.AppendFsync, Properties.AofFileName)
+	} else {
+		log.Info("append-only off")
+	}
+	log.Info("RDB file name: %s", Properties.DBFileName)
+	log.Info("server address: %s", Properties.Address)
+}

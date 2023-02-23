@@ -58,7 +58,6 @@ func NewAofHandler(db database.DB, dbMaker func() database.DB) (*Handler, error)
 		return nil, err
 	}
 	handler.aofFile = file
-	log.Info("AOF enabled, aof file: %s", config.Properties.AofFileName)
 	start := time.Now()
 	err = handler.loadAof(-1)
 	if err != nil {

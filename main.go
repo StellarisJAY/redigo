@@ -18,12 +18,10 @@ _  _, _//  __/ /_/ / _  / / /_/ / / /_/ /
                                    
                                     v1.0.0`
 
-func init() {
-	log.SetLevel(log.LevelError)
-}
-
 func main() {
 	fmt.Println(banner)
+	log.Info("Initializing server")
+	config.DisplayConfigs()
 	db := database.NewMultiDB(config.Properties.Databases, 1024)
 	if config.Properties.EnableClusterMode {
 		log.Info("starting Redigo server in cluster mode...\n")
@@ -34,7 +32,7 @@ func main() {
 			panic(err)
 		}
 	} else {
-		log.Info("starting Redigo server in standalone mode...")
+		log.Info("starting server in standalone mode...")
 		server := tcp.NewServer(config.Properties.Address, db)
 		err := server.Start()
 		if err != nil {

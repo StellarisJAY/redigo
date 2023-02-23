@@ -60,6 +60,7 @@ func (es *EpollServer) Start() error {
 	}()
 
 	go func() {
+		log.Info("server started, Ready to accept connections...")
 		for {
 			select {
 			case <-ctx.Done():
