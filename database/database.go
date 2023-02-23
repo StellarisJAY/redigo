@@ -17,11 +17,12 @@ MultiDB multiDB 是DB接口的多数据库实现。
 提供了Redis中的切换数据库、移动key、持久化等跨数据库命令。
 */
 type MultiDB struct {
-	dbSet      []database.DB                                     // dbSet 数据库集合，默认是16个单独的数据库
-	cmdChan    chan redis.Command                                // cmdChan 并发模式下的命令缓冲channel
-	executors  map[string]func(redis.Command) *redis.RespCommand // executors 命令执行器map，记录命令与executor的映射
-	aofHandler *aof.Handler                                      // aofHandler AOF持久化功能组件
-	hub        *pubsub.Hub                                       // hub 发布订阅功能组件
+	dbSet       []database.DB                                     // dbSet 数据库集合，默认是16个单独的数据库
+	cmdChan     chan redis.Command                                // cmdChan 并发模式下的命令缓冲channel
+	executors   map[string]func(redis.Command) *redis.RespCommand // executors 命令执行器map，记录命令与executor的映射
+	aofHandler  *aof.Handler                                      // aofHandler AOF持久化功能组件
+	hub         *pubsub.Hub                                       // hub 发布订阅功能组件
+	modifyCount int
 }
 
 // NewTempDB 创建临时数据库，临时数据库只用在AOF重写上
@@ -78,6 +79,7 @@ func NewMultiDB(dbSize, cmdChanSize int) *MultiDB {
 	} else {
 		log.Info("RDB Loaded time used: %d ms", time.Now().Sub(rdbStart).Milliseconds())
 	}
+	scheduleSaving(db)
 	return db
 }
 
@@ -102,6 +104,7 @@ func (m *MultiDB) initCommandExecutors() {
 	m.executors["move"] = m.execMove
 	m.executors["save"] = m.execSave
 	m.executors["bgsave"] = m.execBGSave
+	m.executors["timed-bgsave"] = m.execTimedBGSave
 }
 
 func (m *MultiDB) SubmitCommand(command redis.Command) {
@@ -356,4 +359,19 @@ func (m *MultiDB) execSave(command redis.Command) *redis.RespCommand {
 
 func (m *MultiDB) execBGSave(command redis.Command) *redis.RespCommand {
 	return BGSave(m, command)
+}
+
+func (m *MultiDB) execTimedBGSave(command redis.Command) *redis.RespCommand {
+	if m.modifyCount >= config.Properties.RdbThreshold {
+		// do rdb saving
+		BGSave(m, command)
+	}
+	m.modifyCount = 0
+	// reschedule rdb saving
+	scheduleSaving(m)
+	return nil
+}
+
+func (m *MultiDB) increaseModifyCount() {
+	m.modifyCount++
 }
