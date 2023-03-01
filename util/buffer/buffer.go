@@ -1,29 +1,32 @@
 package buffer
 
+import "errors"
+
 type Buffer interface {
 	// Read from buffer, this method extends io.Reader
 	Read([]byte) (int, error)
 	// ReadBytes read from the current read index until the delim byte
 	ReadBytes(delim byte) ([]byte, error)
-	// Next returns a slice of N bytes starting from current read index
-	Next(n int) ([]byte, error)
-	// Skip n bytes
-	Skip(n int) error
-	// ReadByte reads only one byte from read index
-	ReadByte() (byte, error)
-
 	// Write bytes to buffer, io.Writer
 	Write([]byte) (int, error)
-	// WriteString writes a string to buffer
-	WriteString(s string) error
-	// WriteByte writes a single byte to buffer
-	WriteByte(b byte) error
 
 	Len() int
 	Cap() int
-	// Available get the available space in buffer
-	Available() int
+	// MarkReadIndex 记录当前read指针位置，可以通过reset回溯
+	MarkReadIndex()
+	// ResetReadIndex 重置read指针到上次mark的位置
+	ResetReadIndex()
+	// Reset 清空整个buffer
+	Reset()
+	Bytes() []byte
+	ReadIndex() int
+	WriteIndex() int
 }
 
-const EmptyBufferSize = 256
 const MaxBufferSize = 16 * 1024
+
+var (
+	ErrBufferOverflow  = errors.New("buffer overflows")
+	ErrBufferSizeLimit = errors.New("buffer overrun size limit")
+	ErrUnexpectedEOF   = errors.New("unexpected EOF")
+)
