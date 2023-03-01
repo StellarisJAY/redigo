@@ -11,6 +11,7 @@ import (
 	"io"
 	"net"
 	"redigo/redis"
+	"redigo/util/buffer"
 	"redigo/util/log"
 	"runtime"
 	"strconv"
@@ -44,7 +45,7 @@ type EpollConnection struct {
 	epollManager *EpollManager
 
 	wMutex      *sync.Mutex
-	readBuffer  *bytes.Buffer
+	readBuffer  buffer.Buffer
 	writeBuffer *bytes.Buffer
 	active      uint32
 }
@@ -62,7 +63,7 @@ func NewEpollConnection(fd int, epollManager *EpollManager) *EpollConnection {
 		cmdQueue:     make([]*redis.RespCommand, 0),
 		epollManager: epollManager,
 		writeBuffer:  &bytes.Buffer{},
-		readBuffer:   &bytes.Buffer{},
+		readBuffer:   buffer.NewRingBuffer(1024),
 		active:       1,
 		wMutex:       &sync.Mutex{},
 	}

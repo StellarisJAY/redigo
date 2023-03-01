@@ -105,12 +105,14 @@ func (es *EpollServer) onReadEvent(conn *EpollConnection) error {
 		}
 		// 将buffer中的数据全部decode，并提交到DB处理
 		for {
+			conn.readBuffer.MarkReadIndex()
 			command, err := redis.Decode(conn.readBuffer)
 			if err != nil && err != io.EOF {
 				return fmt.Errorf("decode error: %w", err)
 			}
 			// buffer中数据不完整
 			if err == io.EOF || command == nil {
+				conn.readBuffer.ResetReadIndex()
 				return nil
 			}
 			command.BindConnection(conn)
