@@ -3,6 +3,7 @@ package redis
 import (
 	"errors"
 	"io"
+	"redigo/util/str"
 	"strconv"
 	"strings"
 )
@@ -35,14 +36,14 @@ func Decode(reader CodecBuffer) (*RespCommand, error) {
 		command = NewSingleLineCommand(msg[1 : len(msg)-2])
 	case NumberPrefix:
 		// 数字，字符串表示的十进制数字
-		number, err := strconv.Atoi(string(msg[1 : len(msg)-2]))
+		number, err := strconv.Atoi(str.BytesToString(msg[1 : len(msg)-2]))
 		if err != nil {
 			return nil, HashValueNotIntegerError
 		}
 		command = NewNumberCommand(number)
 	case ErrorPrefix:
 		// 错误，前缀后面是错误信息字符串
-		command = NewErrorCommand(errors.New(string(msg[1 : len(msg)-2])))
+		command = NewErrorCommand(errors.New(str.BytesToString(msg[1 : len(msg)-2])))
 	case BulkPrefix:
 		// 多行字符串，格式：$8\r\nabcdefg\r\n
 		bulk, err := readBulkString(reader, msg)
@@ -54,25 +55,19 @@ func Decode(reader CodecBuffer) (*RespCommand, error) {
 		} else {
 			command = NewBulkStringCommand(bulk)
 		}
-		command.SetFromCluster(fromCluster)
-		return command, nil
 	case ArrayPrefix:
 		// 字符串数组，前缀：*SIZE\r\n$LEN\r\n...\r\n...\r\n
-		size, err := strconv.Atoi(string(msg[1 : len(msg)-2]))
+		size, err := strconv.Atoi(str.BytesToString(msg[1 : len(msg)-2]))
 		if err != nil {
 			return nil, err
 		}
 		if size == 0 {
 			command = NewEmptyListCommand()
-			command.SetFromCluster(fromCluster)
-			return command, nil
 		}
 		if parts, err := readArray(reader, size); err != nil {
 			return nil, err
 		} else {
 			command = NewCommand(parts)
-			command.SetFromCluster(fromCluster)
-			return command, nil
 		}
 	}
 	command.SetFromCluster(fromCluster)
@@ -83,17 +78,17 @@ func Decode(reader CodecBuffer) (*RespCommand, error) {
 func Encode(command *RespCommand) []byte {
 	switch command.commandType {
 	case CommandTypeNumber:
-		return []byte(":" + strconv.Itoa(command.number) + CRLF)
+		return str.StringToBytes(":" + strconv.Itoa(command.number) + CRLF)
 	case CommandTypeSingleLine:
-		return []byte("+" + string(command.parts[0]) + CRLF)
+		return str.StringToBytes("+" + string(command.parts[0]) + CRLF)
 	case CommandTypeError:
-		return []byte("-" + command.err.Error() + CRLF)
+		return str.StringToBytes("-" + command.err.Error() + CRLF)
 	case CommandTypeBulk:
-		return []byte("$" + strconv.Itoa(len(command.parts[0])) + CRLF + string(command.parts[0]) + CRLF)
+		return str.StringToBytes("$" + strconv.Itoa(len(command.parts[0])) + CRLF + string(command.parts[0]) + CRLF)
 	case ReplyTypeNil:
-		return []byte("$-1\r\n")
+		return str.StringToBytes("$-1\r\n")
 	case ReplyEmptyList:
-		return []byte("*0\r\n")
+		return str.StringToBytes("*0\r\n")
 	case CommandTypeArray:
 		builder := strings.Builder{}
 		// * length
@@ -113,7 +108,7 @@ func Encode(command *RespCommand) []byte {
 				builder.WriteString(CRLF)
 			}
 		}
-		return []byte(builder.String())
+		return str.StringToBytes(builder.String())
 	}
 	return nil
 }
@@ -124,7 +119,7 @@ ${len}\r\n{content}\r\n
 */
 func readBulkString(reader io.Reader, lengthStr []byte) ([]byte, error) {
 	// parse array length
-	length, err := strconv.Atoi(string(lengthStr[1 : len(lengthStr)-2]))
+	length, err := strconv.Atoi(str.BytesToString(lengthStr[1 : len(lengthStr)-2]))
 	if err != nil {
 		return nil, err
 	}
@@ -134,9 +129,9 @@ func readBulkString(reader io.Reader, lengthStr []byte) ([]byte, error) {
 	}
 	// read bulk string buffer, with \r\n
 	buffer := make([]byte, length+2)
-	_, err = io.ReadFull(reader, buffer)
-	if err != nil {
-		return nil, err
+	n, err := reader.Read(buffer)
+	if err != nil || n < len(buffer) {
+		return nil, io.EOF
 	}
 	return buffer[0:length], nil
 }
