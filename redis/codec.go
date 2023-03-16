@@ -78,17 +78,17 @@ func Decode(reader CodecBuffer) (*RespCommand, error) {
 func Encode(command *RespCommand) []byte {
 	switch command.commandType {
 	case CommandTypeNumber:
-		return str.StringToBytes(":" + strconv.Itoa(command.number) + CRLF)
+		return []byte(":" + strconv.Itoa(command.number) + CRLF)
 	case CommandTypeSingleLine:
-		return str.StringToBytes("+" + string(command.parts[0]) + CRLF)
+		return []byte("+" + string(command.parts[0]) + CRLF)
 	case CommandTypeError:
-		return str.StringToBytes("-" + command.err.Error() + CRLF)
+		return []byte("-" + command.err.Error() + CRLF)
 	case CommandTypeBulk:
-		return str.StringToBytes("$" + strconv.Itoa(len(command.parts[0])) + CRLF + string(command.parts[0]) + CRLF)
+		return []byte("$" + strconv.Itoa(len(command.parts[0])) + CRLF + string(command.parts[0]) + CRLF)
 	case ReplyTypeNil:
-		return str.StringToBytes("$-1\r\n")
+		return []byte("$-1\r\n")
 	case ReplyEmptyList:
-		return str.StringToBytes("*0\r\n")
+		return []byte("*0\r\n")
 	case CommandTypeArray:
 		builder := strings.Builder{}
 		// * length
@@ -108,7 +108,7 @@ func Encode(command *RespCommand) []byte {
 				builder.WriteString(CRLF)
 			}
 		}
-		return str.StringToBytes(builder.String())
+		return []byte(builder.String())
 	}
 	return nil
 }
