@@ -17,7 +17,7 @@ import (
 )
 
 type EpollServer struct {
-	em      *EpollManager
+	em      *EpollEventLoop
 	address string
 	db      database.DB
 }
