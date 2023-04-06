@@ -1,5 +1,5 @@
-databases: 16
-appendOnly: false
-aofFileName: appendonly.log
-dbFileName: dump.rdb
-address: 127.0.0.1:6381
+databases: 16 #数据库数量
+appendOnly: false #是否开启aof持久化
+aofFileName: appendonly.log #aof文件名
+dbFileName: dump.rdb #rdb文件名
+address: 0.0.0.0:6381 #服务器地址
