@@ -20,7 +20,7 @@ export BENCH_T = "set,get,lpush,lpop,rpush,rpop,hset,zadd,sadd"
 export BENCH_PIPELINE=1
 build:env
 	@GOOS=$(PLATFORM) GOARCH=$(ARCH) CGO_ENABLE=0 \
-	go build -o ./target/redigo
+	go build -o ./target/redigo cmd/server/main.go
 run:build
 	@./target/redigo --config="$(CONFIG_FILE)"
 env:
