@@ -2,7 +2,6 @@ package aof
 
 import (
 	"io"
-	"io/ioutil"
 	"os"
 	"redigo/config"
 	"redigo/interface/database"
@@ -20,7 +19,7 @@ type rewriteContext struct {
 
 func (h *Handler) makeRewriteHandler() *Handler {
 	handler := &Handler{}
-	// make a temporary database to hold rewrite data
+	// 创建临时数据库来保存rewrie时新增的data
 	handler.db = h.dbMaker()
 	handler.aofFile = h.aofFile
 	handler.aofFileName = h.aofFileName
@@ -29,14 +28,13 @@ func (h *Handler) makeRewriteHandler() *Handler {
 }
 
 func (h *Handler) StartRewrite() error {
-	// CAS rewrite status
+	// cas避免同时rewrite
 	if !h.RewriteStarted.CompareAndSwap(false, true) {
 		return redis.AppendOnlyRewriteInProgressError
 	}
 	go func() {
 		start := time.Now()
-		err := h.rewrite()
-		if err != nil {
+		if err := h.rewrite(); err != nil {
 			log.Errorf("rewrite aof error: %v", err)
 		}
 		h.RewriteStarted.Store(false)
@@ -46,40 +44,36 @@ func (h *Handler) StartRewrite() error {
 }
 
 func (h *Handler) rewrite() error {
-	// get current online aof handler's context of this moment
 	context, err := h.prepareRewrite()
 	if err != nil {
 		return err
 	}
 
-	err = h.doRewrite(context)
-	if err != nil {
+	if err := h.doRewrite(context); err != nil {
 		return err
 	}
-	// finish rewrite by removing old aof file
-	err = h.finishRewrite(context)
-	return err
+
+	return h.finishRewrite(context)
 }
 
 func (h *Handler) doRewrite(ctx *rewriteContext) error {
-	// create a temp database
 	tempAof := h.makeRewriteHandler()
-	// load aof file's data into temp database
-	err := tempAof.loadAof(ctx.oldFileSize)
-	if err != nil {
+
+	if err := tempAof.loadAof(ctx.oldFileSize); err != nil {
 		return err
 	}
 	for i := 0; i <= config.Properties.Databases; i++ {
-		// skip empty databases
+		// 跳过空数据库
 		if tempAof.db.Len(i) == 0 {
 			continue
 		}
-		//rewrite select database command
+		// 插入select命令切换数据库
 		selectCmd := redis.NewStringArrayCommand([]string{"SELECT", strconv.Itoa(i)})
 		_, err := ctx.tmpFile.Write(selectCmd.ToBytes())
 		if err != nil {
 			return err
 		}
+		// 保存数据库keys
 		tempAof.db.ForEach(i, func(key string, entry *database.Entry, expire *time.Time) bool {
 			command := EntryToCommand(key, entry)
 			if command != nil {
@@ -95,13 +89,12 @@ func (h *Handler) doRewrite(ctx *rewriteContext) error {
 	return nil
 }
 
-// prepareRewrite creates temp aof file and make the context of online aof handler
+// prepareRewrite 初始化重写：创建aof临时文件和重写上下文
 func (h *Handler) prepareRewrite() (*rewriteContext, error) {
 	h.aofLock.Lock()
 	defer h.aofLock.Unlock()
-	// sync the un-flushed data to persist storage
-	err := h.aofFile.Sync()
-	if err != nil {
+	// fsync将未落盘的aof写入文件
+	if err := h.aofFile.Sync(); err != nil {
 		return nil, err
 	}
 	stat, err := os.Stat(h.aofFileName)
@@ -109,8 +102,7 @@ func (h *Handler) prepareRewrite() (*rewriteContext, error) {
 		return nil, err
 	}
 	size := stat.Size()
-	// create a temp file to store rewrite data
-	file, err := ioutil.TempFile("./", "*.aof")
+	file, err := os.CreateTemp("./", "*.aof")
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +113,7 @@ func (h *Handler) prepareRewrite() (*rewriteContext, error) {
 	}, nil
 }
 
-// finishRewrite removes old aof file
+// finishRewrite 重写结束，将旧aof文件中的新追加数据添加到新文件，然后将旧aof文件删除
 func (h *Handler) finishRewrite(ctx *rewriteContext) error {
 	h.aofLock.Lock()
 	defer h.aofLock.Unlock()
@@ -134,30 +126,28 @@ func (h *Handler) finishRewrite(ctx *rewriteContext) error {
 		log.Errorf("Open old aof file failed: %v", err)
 		return err
 	}
-	// seek the position of the original aof file before rewrite
-	_, err = src.Seek(ctx.oldFileSize, 0)
-	if err != nil {
+	// seek到旧文件的末尾
+	if _, err := src.Seek(ctx.oldFileSize, 0); err != nil {
 		log.Errorf("Seek offset in old aof file failed %v", err)
 		return err
 	}
-	// change temp file's database to online aof file's database before rewrite
+	// 切换到服务器正在使用的dbIdx，插入一条select
 	selectDbCommand := redis.NewStringArrayCommand([]string{"SELECT", strconv.Itoa(ctx.currentDB)})
 	_, _ = ctx.tmpFile.Write(selectDbCommand.ToBytes())
-	// copy the newly written commands in old aof file to new aof file
+	// 将旧文件的数据转移到新文件末尾
 	_, err = io.Copy(ctx.tmpFile, src)
 
-	// Close old aof file and rename temp file
 	_ = src.Close()
 	_ = h.aofFile.Close()
 	_ = ctx.tmpFile.Close()
 	_ = os.Rename(ctx.tmpFile.Name(), h.aofFileName)
 
+	// 重新设置服务器的aof文件
 	aofFile, err := os.OpenFile(h.aofFileName, os.O_APPEND|os.O_CREATE|os.O_RDWR, 0666)
 	if err != nil {
 		return err
 	}
 	h.aofFile = aofFile
-	// reset current database in new aof file
 	selectDbCommand = redis.NewStringArrayCommand([]string{"SELECT", strconv.Itoa(h.currentDB)})
 	_, _ = ctx.tmpFile.Write(selectDbCommand.ToBytes())
 	return nil

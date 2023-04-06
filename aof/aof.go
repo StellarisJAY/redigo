@@ -41,31 +41,29 @@ func NewDummyAofHandler() *Handler {
 
 func NewAofHandler(db database.DB, dbMaker func() database.DB) (*Handler, error) {
 	handler := &Handler{db: db}
-	handler.aofChan = make(chan Payload, 1<<16)
+	handler.aofChan = make(chan Payload, 1<<20)
 	handler.closeChan = make(chan struct{})
 	handler.aofLock = sync.Mutex{}
 	handler.RewriteStarted = atomic.Value{}
 	handler.RewriteStarted.Store(false)
 	handler.dbMaker = dbMaker
-	// create a ticker for EverySec AOF
+	// 每秒aof的ticker
 	if config.Properties.AppendFsync == config.FsyncEverySec {
 		handler.ticker = time.NewTicker(1 * time.Second)
 	}
 	handler.aofFileName = config.Properties.AofFileName
-	// open append file
-	file, err := os.OpenFile(handler.aofFileName, os.O_APPEND|os.O_CREATE|os.O_RDWR, 0666)
-	if err != nil {
+	if file, err := os.OpenFile(handler.aofFileName, os.O_APPEND|os.O_CREATE|os.O_RDWR, 0666); err != nil {
 		return nil, err
+	}else {
+		handler.aofFile = file
 	}
-	handler.aofFile = file
 	start := time.Now()
-	err = handler.loadAof(-1)
-	if err != nil {
+	if err := handler.loadAof(-1); err != nil {
 		panic(err)
 	}
 	log.Info("AOF loaded, time used: %d ms", time.Now().Sub(start).Milliseconds())
+	// 处理fsync
 	go func() {
-		// fsync policy every sec
 		if config.Properties.AppendFsync == config.FsyncEverySec {
 			handler.handleEverySec()
 		} else {
@@ -85,37 +83,36 @@ func (h *Handler) AddAof(command [][]byte, index int) {
 
 // handle commands every second
 func (h *Handler) handleEverySec() {
+LOOP:
 	for {
 		select {
 		case <-h.closeChan:
 			h.aofLock.Lock()
-			// receive close signal, break handle loop
+			// fsync剩余的aof任务
 			h.handleRemaining(len(h.aofChan))
 			h.aofLock.Unlock()
-			break
+			break LOOP
 		case <-h.ticker.C:
 			h.aofLock.Lock()
-			// handle remaining commands in aof queue every sec
+			// 每秒将chan中所有的aof都sync
 			remaining := len(h.aofChan)
 			if remaining > 0 {
 				h.handleRemaining(len(h.aofChan))
 			}
 			h.aofLock.Unlock()
-			continue
 		}
 	}
 }
 
-// handle func of AOF
 func (h *Handler) handle() {
+LOOP:
 	for {
 		select {
 		case <-h.closeChan:
 			h.aofLock.Lock()
-			// receive close signal, break handle loop
 			h.handleRemaining(len(h.aofChan))
 			h.aofLock.Unlock()
-			break
+			break LOOP
 		case payload := <-h.aofChan:
 			h.aofLock.Lock()
 			h.handlePayload(payload)
@@ -124,7 +121,6 @@ func (h *Handler) handle() {
 	}
 }
 
-// handle the remaining un-written commands before closing
 func (h *Handler) handleRemaining(remaining int) {
 	for i := 0; i < remaining; i++ {
 		payload := <-h.aofChan
@@ -133,21 +129,19 @@ func (h *Handler) handleRemaining(remaining int) {
 }
 
 func (h *Handler) handlePayload(p Payload) {
-	// Add select DB command if payload's database is not aof handler's current db
+	//当前数据库idx和payload不同，需要追加select命令
 	if p.idx != h.currentDB {
 		cmd := []string{"SELECT", strconv.Itoa(p.idx)}
 		raw := redis.NewStringArrayCommand(cmd)
-		_, err := h.aofFile.Write(raw.ToBytes())
-		if err != nil {
+		if _, err := h.aofFile.Write(raw.ToBytes()); err != nil {
 			log.Errorf("aof write select db error: %v", err)
 			return
 		}
 		h.currentDB = p.idx
 	}
-	// Get RESP from command line
+
 	raw := redis.NewArrayCommand(p.command)
-	_, err := h.aofFile.Write(raw.ToBytes())
-	if err != nil {
+	if _, err := h.aofFile.Write(raw.ToBytes()); err != nil {
 		log.Errorf("aof write command error: %v", err)
 	}
 }
@@ -168,7 +162,7 @@ func (h *Handler) loadAof(maxBytes int64) error {
 		r = file
 	}
 	reader := bufio.NewReader(r)
-	// a fake connection, to hold the database index
+	//fake conn 用来记录当前的db index
 	fakeConn := tcp.Connection{}
 	for {
 		cmd, err := redis.Decode(reader)
@@ -178,7 +172,6 @@ func (h *Handler) loadAof(maxBytes int64) error {
 			}
 			break
 		}
-		// change database index
 		if cmd.Name() == "select" {
 			idx, err := strconv.Atoi(string(cmd.Args()[0]))
 			if err != nil {
@@ -186,8 +179,7 @@ func (h *Handler) loadAof(maxBytes int64) error {
 			}
 			fakeConn.SelectDB(idx)
 		}
-
-		// bind the fake connection with command and execute command
+		
 		cmd.BindConnection(&fakeConn)
 		h.db.Execute(cmd)
 	}

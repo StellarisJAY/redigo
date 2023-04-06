@@ -21,7 +21,7 @@ var (
 	pExpireAtCmd = []byte("PEXPIREAT")
 )
 
-// EntryToCommand create RESP style commands from entry holding data
+// EntryToCommand 将key-value数据转换成redis命令
 func EntryToCommand(key string, entry *database.Entry) *redis.RespCommand {
 	if entry == nil {
 		return nil
@@ -39,7 +39,7 @@ func EntryToCommand(key string, entry *database.Entry) *redis.RespCommand {
 	case *zset.SortedSet:
 		command = zsetToCommand(key, entry.Data.(*zset.SortedSet))
 	case *bitmap.BitMap:
-		// convert bitmap to []byte to save AOF
+		// 将bitmap转换成[]byte保存
 		bm := entry.Data.(*bitmap.BitMap)
 		command = stringToCommand(key, *bm)
 	}
