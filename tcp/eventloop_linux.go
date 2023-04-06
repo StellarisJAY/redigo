@@ -147,7 +147,6 @@ func (e *EpollEventLoop) Handle(ctx context.Context) error {
 			// 通过fd查询到一个连接对象
 			v, ok := e.conns.Load(int(event.Fd))
 			if !ok {
-				log.Errorf("unknown connection fd: %d", event.Fd)
 				continue
 			}
 			conn := v.(*EpollConnection)

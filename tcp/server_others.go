@@ -11,7 +11,6 @@ import (
 	"os"
 	"os/signal"
 	"redigo/interface/database"
-	"redigo/util/log"
 	"sync"
 	"syscall"
 )
@@ -117,7 +116,7 @@ func (s *GoNetServer) acceptLoop(ctx context.Context) error {
 	}
 }
 
-func (s *GoNetServer) shutdown() {
+func (s *GoNetServer) Close() {
 	log.Info("Shutting down RediGO server...")
 	_ = s.listener.Close()
 	// close database

@@ -20,6 +20,7 @@ type EpollServer struct {
 	em      *EpollEventLoop
 	address string
 	db      database.DB
+	cancel  context.CancelFunc
 }
 
 func NewServer(address string, db database.DB) *EpollServer {
@@ -38,6 +39,7 @@ func (es *EpollServer) Start() error {
 		return err
 	}
 	ctx, cancel := context.WithCancel(context.Background())
+	es.cancel = cancel
 	go func() {
 		err := es.db.ExecuteLoop()
 		if err != nil {
@@ -120,4 +122,8 @@ func (es *EpollServer) onReadEvent(conn *EpollConnection) error {
 		}
 	}
 	return nil
+}
+
+func (es *EpollServer) Close() {
+	es.cancel()
 }
