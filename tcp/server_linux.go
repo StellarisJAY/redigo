@@ -40,49 +40,13 @@ func (es *EpollServer) Start() error {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	es.cancel = cancel
-	go func() {
-		err := es.db.ExecuteLoop()
-		if err != nil {
-			// database正常情况不会返回error
-			panic(err)
-		}
-	}()
-
-	go func() {
-		// wait for close signal
-		<-ctx.Done()
-		log.Info("Shutting down RediGO server...")
-		// close database
-		es.db.Close()
-	}()
-
+	
+	go es.commandExecutor()
+	go es.gracefulShutdown(ctx)
+	go es.acceptor(ctx)
+	go es.eventloop(ctx)
 	// pprof
-	go func() {
-		_ = http.ListenAndServe(":8899", nil)
-	}()
-
-	go func() {
-		log.Info("server started, Ready to accept connections...")
-		for {
-			select {
-			case <-ctx.Done():
-				break
-			default:
-			}
-			err := es.em.Accept()
-			if err != nil {
-				log.Errorf("accept error: %v", err)
-				cancel()
-			}
-		}
-	}()
-
-	go func() {
-		err := es.em.Handle(ctx)
-		if err != nil {
-			log.Errorf("epoll handler error: %v", err)
-		}
-	}()
+	go http.ListenAndServe(":8899", nil)
 
 	// listen close signal
 	sigCh := make(chan os.Signal)
@@ -122,6 +86,45 @@ func (es *EpollServer) onReadEvent(conn *EpollConnection) error {
 		}
 	}
 	return nil
+}
+
+func (es *EpollServer) commandExecutor() {
+	err := es.db.ExecuteLoop()
+	if err != nil {
+		// database正常情况不会返回error
+		panic(err)
+	}
+}
+
+func (es *EpollServer) acceptor(ctx context.Context) {
+	log.Info("server started, Ready to accept connections...")
+	for {
+		select {
+		case <-ctx.Done():
+			break
+			default:
+				err := es.em.Accept()
+				if err != nil {
+					log.Errorf("accept error: %v", err)
+					es.cancel()
+				}
+		}
+	}
+}
+
+func (es *EpollServer) gracefulShutdown(ctx context.Context) {
+	// wait for close signal
+	<-ctx.Done()
+	log.Info("Shutting down RediGO server...")
+	// close database
+	es.db.Close()
+}
+
+func (es *EpollServer) eventloop(ctx context.Context) {
+	err := es.em.Handle(ctx)
+	if err != nil {
+		log.Errorf("epoll handler error: %v", err)
+	}
 }
 
 func (es *EpollServer) Close() {

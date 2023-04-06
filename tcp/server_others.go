@@ -21,6 +21,7 @@ type GoNetServer struct {
 	activeConns sync.Map
 	listener    net.Listener
 	db          database.DB
+	cancel context.CancelFunc
 }
 
 func NewServer(address string, db database.DB) *GoNetServer {
@@ -38,19 +39,14 @@ func (s *GoNetServer) Start() error {
 	}
 	s.listener = listener
 	ctx, cancel := context.WithCancel(context.Background())
-	// start database execution loop
-	go func() {
-		execErr := s.db.ExecuteLoop()
-		if execErr != nil {
-			// database 正常情况下不会返回错误
-			panic(err)
-		}
-	}()
-	// graceful shutdown
-	go func() {
-		<-ctx.Done()
-		s.shutdown()
-	}()
+
+	// 启动database和server
+	go s.commandExecutor()
+	go s.acceptor(ctx)
+	go s.gracefullyShutdown(ctx)
+	// pprof
+	go http.ListenAndServe(":8899", nil)
+
 	// listen close signal
 	sigCh := make(chan os.Signal)
 	signal.Notify(sigCh, syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT)
@@ -61,17 +57,7 @@ func (s *GoNetServer) Start() error {
 			cancel()
 		}
 	}()
-
-	// pprof
-	go func() {
-		_ = http.ListenAndServe(":8899", nil)
-	}()
-
-	// run acceptor
-	err = s.acceptLoop(ctx)
-	if err != nil {
-		cancel()
-	}
+	<-ctx.Done()
 	return nil
 }
 
@@ -113,6 +99,26 @@ func (s *GoNetServer) acceptLoop(ctx context.Context) error {
 			}
 			s.activeConns.Delete(connect)
 		}(connection)
+	}
+}
+
+func (s *GoNetServer) commandExecutor(ctx context.Context) {
+	execErr := s.db.ExecuteLoop()
+	if execErr != nil {
+		// database 正常情况下不会返回错误
+		panic(err)
+	}
+}
+
+func (s *GoNetServer) gracefullyShutdown(ctx context.Context) {
+	<-ctx.Done()
+	s.shutdown()
+}
+
+func (s *GoNetServer) acceptor(ctx context.Context) {
+	err = s.acceptLoop(ctx)
+	if err != nil {
+		cancel()
 	}
 }
 
