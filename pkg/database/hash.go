@@ -32,7 +32,6 @@ func execHSet(db *SingleDB, command redis.Command) *redis.RespCommand {
 	if err != nil {
 		return redis.NewErrorCommand(err)
 	}
-	// get key-value pairs from args; put them into hash structure
 	kvs := args[1:]
 	i := 0
 	for i < len(kvs) {
@@ -46,7 +45,6 @@ func execHSet(db *SingleDB, command redis.Command) *redis.RespCommand {
 	}
 	db.addVersion(key)
 	db.addAof(command.Parts())
-	// return how many key-value pairs has been put
 	return redis.NewNumberCommand(i / 2)
 }
 
@@ -65,7 +63,6 @@ func execHGet(db *SingleDB, command redis.Command) *redis.RespCommand {
 			return redis.NewBulkStringCommand(value.([]byte))
 		}
 	}
-	// return (nil) if hash not exists or key not exists
 	return redis.NilCommand
 }
 
@@ -121,7 +118,6 @@ func execHGetAll(db *SingleDB, command redis.Command) *redis.RespCommand {
 	if exists && hash.Len() > 0 {
 		result := make([][]byte, hash.Len()*2)
 		i := 0
-		// store key-value pairs in slice
 		hash.ForEach(func(key string, value interface{}) bool {
 			result[i] = []byte(key)
 			result[i+1] = value.([]byte)
@@ -214,12 +210,10 @@ func execHIncrBy(db *SingleDB, command redis.Command) *redis.RespCommand {
 		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("HINCRBY"))
 	}
 	key, hKey := string(args[0]), string(args[1])
-	// parse delta value
 	delta, err := strconv.Atoi(string(args[2]))
 	if err != nil {
 		return redis.NewErrorCommand(redis.HashValueNotIntegerError)
 	}
-	// get or init a new hash structure
 	hash, err := getOrInitHash(db, key)
 	if err != nil {
 		return redis.NewErrorCommand(err)
@@ -228,7 +222,6 @@ func execHIncrBy(db *SingleDB, command redis.Command) *redis.RespCommand {
 	val, exists := hash.Get(hKey)
 	var result int
 	if exists {
-		// value type must be integer
 		result, err = strconv.Atoi(string(val.([]byte)))
 		if err != nil {
 			return redis.NewErrorCommand(redis.HashValueNotIntegerError)

@@ -40,31 +40,24 @@ func (db *SingleDB) SubmitCommand(_ redis.Command) {
 	panic(errors.New("unsupported operation"))
 }
 
-/*
-Execute a command
-Finds the executor in executor map, then call execFunc to handle it
-*/
+
 func (db *SingleDB) Execute(command redis.Command) *redis.RespCommand {
 	cmd := command.Name()
 	if cmd == "keys" {
-		// get all keys from db, but don't match pattern now
+		// 获取所有的keys，然后在单独的goroutine进行模式匹配，可以避免keys命令阻塞executor
+		// 大量keys可能导致内存激增
 		keys := db.data.Keys()
-		// start a new goroutine to do pattern matching
 		go func(command redis.Command, keys []string) {
 			reply := execKeys(db, command, keys)
 			command.Connection().SendCommand(reply)
 		}(command, keys)
 		return nil
-	} else {
-		exec, exists := executors[cmd]
-		if exists {
-			reply := exec.execFunc(db, command)
-			return reply
-		} else {
-			// command executor doesn't exist, send unknown command to client
-			return redis.NewErrorCommand(redis.CreateUnknownCommandError(cmd))
-		}
 	}
+	if exec, exists := executors[cmd]; exists {
+		reply := exec.execFunc(db, command)
+		return reply
+	}
+	return redis.NewErrorCommand(redis.CreateUnknownCommandError(cmd))
 }
 
 func (db *SingleDB) ForEach(_ int, fun func(key string, entry *database.Entry, expire *time.Time) bool) {
@@ -294,7 +287,7 @@ func (db *SingleDB) updateEntry(entry *database.Entry, value []byte) {
 	entry.DataSize = int64(len(value))
 }
 
-func (db *SingleDB) onKeyEvict(key string, value interface{}) {
+func (db *SingleDB) onKeyEvict(key string, _ interface{}) {
 	db.data.Remove(key)
 	db.ttlMap.Remove(key)
 	db.versionMap.Remove(key)

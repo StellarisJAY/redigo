@@ -28,15 +28,17 @@ func BGSave(db *MultiDB, command redis.Command) *redis.RespCommand {
 		})
 	}
 	// run save in background
-	go func(entries [][]*rdb.DataEntry, startTime time.Time) {
-		// release rewrite lock
-		defer m.aofHandler.RewriteStarted.Store(false)
-		err := rdb.BGSave(entries)
-		if err != nil {
-			log.Errorf("BGSave RDB error: %v", err)
-		} else {
-			log.Info("BGSave RDB finished: %d ms", time.Now().Sub(startTime).Milliseconds())
-		}
-	}(snapshot, startTime)
+	go handleBgSave(snapshot, startTime)
 	return redis.NewSingleLineCommand([]byte("Background saving started"))
+}
+
+func handleBgSave(entries [][]*rdb.DataEntry, startTime time.Time) {
+	// release rewrite lock
+	defer m.aofHandler.RewriteStarted.Store(false)
+	err := rdb.BGSave(entries)
+	if err != nil {
+		log.Errorf("BGSave RDB error: %v", err)
+	} else {
+		log.Info("BGSave RDB finished: %d ms", time.Now().Sub(startTime).Milliseconds())
+	}
 }

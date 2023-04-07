@@ -48,11 +48,10 @@ func NewMultiDB(dbSize, cmdChanSize int) *MultiDB {
 		hub:       pubsub.MakeHub(),
 	}
 	db.initCommandExecutors()
-	// initialize single databases in db set
 	for i := 0; i < dbSize; i++ {
 		db.dbSet[i] = NewSingleDB(i)
 	}
-	// initialize AOF
+	// 初始化aof
 	if config.Properties.AppendOnly {
 		aofHandler, err := aof.NewAofHandler(db, func() database.DB {
 			return NewTempDB(config.Properties.Databases)
@@ -60,9 +59,9 @@ func NewMultiDB(dbSize, cmdChanSize int) *MultiDB {
 		if err != nil {
 			panic(err)
 		}
+		// 设置每个数据库的aofHandler
 		for _, sdb := range db.dbSet {
 			singleDB := sdb.(*SingleDB)
-			// make singleDB's addAof call aofHandler's AddAOF
 			singleDB.addAof = func(command [][]byte) {
 				aofHandler.AddAof(command, singleDB.idx)
 			}
@@ -83,8 +82,9 @@ func NewMultiDB(dbSize, cmdChanSize int) *MultiDB {
 	return db
 }
 
-// Register MultiDB commands here
+// 注册服务器级别的命令
 func (m *MultiDB) initCommandExecutors() {
+	// command命令直接返回OK
 	m.executors["command"] = func(command redis.Command) *redis.RespCommand {
 		return redis.OKCommand
 	}
@@ -126,7 +126,7 @@ func (m *MultiDB) ExecuteLoop() error {
 		if !ok {
 			return nil
 		}
-		// execute command and get a reply if command is not dispatched to single database
+		// 服务器级别的命令会返回reply，数据库命令会由数据库处理器执行
 		reply := m.Execute(cmd)
 		if reply != nil {
 			cmd.Connection().SendCommand(reply)
@@ -156,7 +156,6 @@ func (m *MultiDB) Execute(command redis.Command) *redis.RespCommand {
 }
 
 func (m *MultiDB) OnConnectionClosed(conn redis.Connection) {
-	// un-subscribe all channels of this connection
 	m.hub.UnSubscribeAll(conn)
 }
 

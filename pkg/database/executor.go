@@ -5,12 +5,12 @@ import (
 	"strings"
 )
 
-// ExecFunc executes a command using target database, returns a Reply
+// ExecFunc 定义命令处理函数，参数：数据库实例、命令，返回：redis命令
 type ExecFunc func(db *SingleDB, command redis.Command) *redis.RespCommand
 
 type CommandExecutor struct {
 	execFunc ExecFunc
-	argCount int // nums of args needed, if argCount < 0: len(args) >= -argCount
+	argCount int // 命令需要的参数数量，argCount>0, 则参数必须等于argCount，小于0则大于等于argCount
 }
 
 var executors = make(map[string]*CommandExecutor)
