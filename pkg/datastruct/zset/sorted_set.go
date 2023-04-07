@@ -8,7 +8,7 @@ type SortedSet struct {
 func NewSortedSet() *SortedSet {
 	return &SortedSet{
 		dict: make(map[string]*node),
-		skl:  NewSkipList(),
+		skl:  newSkipList(),
 	}
 }
 

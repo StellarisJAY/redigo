@@ -2,7 +2,6 @@ package bitmap
 
 import "fmt"
 
-// BitMap data structure is the same with normal byte slice
 type BitMap []byte
 
 func New() *BitMap {
@@ -10,12 +9,12 @@ func New() *BitMap {
 	return &b
 }
 
-// each slot contains 8 bits, this function tells the target offset's slot
+// 每个slot 8bits
 func getSlot(offset int64) int64 {
 	return offset / 8
 }
 
-// if offset is greater than bitMap's slice size, expand slice
+// 扩容bitmap
 func (b *BitMap) grow(size int64) {
 	i := size - int64(len(*b))
 	if i <= 0 {
@@ -31,12 +30,10 @@ func (b *BitMap) SetBit(offset int64, bit byte) byte {
 	original := (*b)[slot] >> offset0 & 0x01
 	switch bit {
 	case 1:
-		// set 1: slot | 1<<offset
 		var mask byte = 1 << offset0
 		(*b)[slot] = (*b)[slot] | mask
 	case 0:
-		// set 0: slot & (1<<offset) ^ 0xff
-		var mask byte = (1 << offset0) ^ 0xff
+		var mask byte = ^(1 << offset0)
 		(*b)[slot] = (*b)[slot] & mask
 	default:
 		panic(fmt.Errorf("bit can only be 1 or 0"))
@@ -94,8 +91,3 @@ func bitCount(slot byte, offset0, offset1 int) int {
 	return count
 }
 
-func (b *BitMap) printBits() {
-	for _, bit := range *b {
-		fmt.Println(bit)
-	}
-}

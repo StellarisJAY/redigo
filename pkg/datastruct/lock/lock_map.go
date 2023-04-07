@@ -7,10 +7,9 @@ import (
 
 var prime32 uint32 = 123456
 
+// Locker 分段锁，通过分段减小锁的粒度
 type Locker struct {
 	slots         []*sync.RWMutex
-	intentionWait *sync.WaitGroup
-	intentionLock *sync.RWMutex
 }
 
 func NewLock(slots int) *Locker {
@@ -18,8 +17,6 @@ func NewLock(slots int) *Locker {
 	for i := 0; i < slots; i++ {
 		lock.slots[i] = &sync.RWMutex{}
 	}
-	lock.intentionLock = &sync.RWMutex{}
-	lock.intentionWait = &sync.WaitGroup{}
 	return lock
 }
 
@@ -60,6 +57,7 @@ func (l *Locker) RUnlock(key string) {
 	l.slots[idx].RUnlock()
 }
 
+// getLockSlots 获取keys对应的锁的slots，通过排序避免死锁
 func (l *Locker) getLockSlots(keys ...string) []uint32 {
 	slotMap := make(map[uint32]bool)
 	for _, key := range keys {
@@ -77,6 +75,7 @@ func (l *Locker) getLockSlots(keys ...string) []uint32 {
 	return slots
 }
 
+// RLockAll 获取多个R锁
 func (l *Locker) RLockAll(keys ...string) {
 	slots := l.getLockSlots(keys...)
 	for _, slot := range slots {
@@ -93,6 +92,7 @@ func (l *Locker) RUnlockAll(keys ...string) {
 	}
 }
 
+// LockAll 获取多个互斥锁
 func (l *Locker) LockAll(keys ...string) {
 	slots := l.getLockSlots(keys...)
 	for _, slot := range slots {

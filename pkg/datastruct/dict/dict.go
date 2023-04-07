@@ -1,6 +1,6 @@
 package dict
 
-// Consumer is used in ForEach. If this function returns false, the traverse will end
+//Consumer 用于foreach遍历，返回false表示结束遍历
 type Consumer func(key string, value interface{}) bool
 
 type Dict interface {

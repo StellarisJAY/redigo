@@ -284,8 +284,6 @@ func isHash(entry *database.Entry) bool {
 	switch entry.Data.(type) {
 	case *dict.SimpleDict:
 		return true
-	case *dict.SafeDict:
-		return true
 	}
 	return false
 }

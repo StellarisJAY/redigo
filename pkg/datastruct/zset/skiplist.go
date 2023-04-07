@@ -13,14 +13,14 @@ type Element struct {
 }
 
 type Level struct {
-	forward *node // next node on this level
-	span    int64 // how many nodes skipped from current node to next node on this level
+	forward *node // 当前节点在该层的下一个节点
+	span    int64 // 该节点到下一个节点的跨度
 }
 
 type node struct {
 	Element
 	backward *node
-	level    []*Level // levels of a linked-list node
+	level    []*Level // 每个节点可以有多层
 }
 
 type skipList struct {
@@ -29,13 +29,11 @@ type skipList struct {
 	size       int64
 }
 
-func NewSkipList() *skipList {
-	// init skl, current has 1 level
+func newSkipList() *skipList {
 	skl := &skipList{level: 1, size: 0}
 	skl.head = &node{level: make([]*Level, maxLevels)}
-	// head has all levels
+	// 头节点拥有最大层数
 	for i := 0; i < maxLevels; i++ {
-		// fill head's levels with empty Level
 		skl.head.level[i] = &Level{forward: nil, span: 0}
 	}
 	skl.head.Member = ""
