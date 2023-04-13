@@ -2,7 +2,6 @@ package tcp
 
 import (
 	"bytes"
-	"context"
 	"redigo/pkg/redis"
 	"redigo/pkg/util/buffer"
 	"sync"
