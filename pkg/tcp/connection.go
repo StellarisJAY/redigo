@@ -48,13 +48,18 @@ func (c *Connection) ReadLoop() error {
 	reader.Reset(c.conn)
 	defer readerPool.Put(reader)
 	for {
-		//parse RESP
-		cmd, err := redis.Decode(reader)
-		if err != nil {
-			return err
-		} else {
-			cmd.BindConnection(c)
-			c.db.SubmitCommand(cmd)
+		select {
+		case <-c.ctx.Done():
+			return nil
+		default:
+			//parse RESP
+			cmd, err := redis.Decode(reader)
+			if err != nil {
+				return err
+			} else {
+				cmd.BindConnection(c)
+				c.db.SubmitCommand(cmd)
+			}
 		}
 	}
 }
@@ -68,7 +73,7 @@ func (c *Connection) WriteLoop() error {
 	for {
 		select {
 		case reply := <-c.replyChan:
-			buffer := bufferPool.Get().(*bytes.Buffer)
+			buffer := writeBufferPool.Get().(*bytes.Buffer)
 			buffer.Write(redis.Encode(reply))
 			size := len(c.replyChan)
 			for i := 0; i < size; i++ {
@@ -76,7 +81,7 @@ func (c *Connection) WriteLoop() error {
 			}
 			_, err := c.conn.Write(buffer.Bytes())
 			buffer.Reset()
-			bufferPool.Put(buffer)
+			writeBufferPool.Put(buffer)
 			if err != nil {
 				return err
 			}

@@ -15,6 +15,7 @@ const (
 	CommandTypeError                  // 错误
 	ReplyTypeNil                      // 空返回，Nil
 	ReplyEmptyList                    // 空列表返回
+	CRLF = "\r\n"
 )
 
 const (

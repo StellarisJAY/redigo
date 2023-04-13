@@ -126,47 +126,54 @@ func (e *EpollEventLoop) Handle(ctx context.Context) error {
 		case <-ctx.Done():
 			return nil
 		default:
-		}
-		events := make([]syscall.EpollEvent, 1024)
-		n, err := epollWait(e.epollFd, events, e.waitMsec)
-		if err != nil {
-			if err.Error() == "interrupted system call" {
-				continue
-			}
-			return fmt.Errorf("epoll wait error: %v", err)
-		}
-		// 没有事件，进入阻塞模式
-		if n <= 0 {
-			e.waitMsec = -1
-			runtime.Gosched()
-			continue
-		}
-		// 有事件，继续无阻塞循环
-		e.waitMsec = 0
-		for _, event := range events {
-			// 通过fd查询到一个连接对象
-			v, ok := e.conns.Load(int(event.Fd))
-			if !ok {
-				continue
-			}
-			conn := v.(*EpollConnection)
-			// epoll关闭事件
-			if event.Events&EpollClose == uint32(EpollClose) {
-				if err := e.CloseConn(conn); err != nil {
-					return fmt.Errorf("close conn error: %v", err)
-				}
-				continue
-			}
-			// epoll in
-			if event.Events&syscall.EPOLLIN == syscall.EPOLLIN {
-				e.DispatchIO(conn, Read)
-			}
-			// epoll out
-			if event.Events&EpollWritable == EpollWritable {
-				e.DispatchIO(conn, Write)
+			if err := e.onEpollEvents(); err != nil {
+				return err
 			}
 		}
 	}
+}
+
+func (e *EpollEventLoop) onEpollEvents() error {
+	events := make([]syscall.EpollEvent, 1024)
+	n, err := epollWait(e.epollFd, events, e.waitMsec)
+	if err != nil {
+		if err.Error() == "interrupted system call" {
+			return nil
+		}
+		return fmt.Errorf("epoll wait error: %v", err)
+	}
+	// 没有事件，进入阻塞模式
+	if n <= 0 {
+		e.waitMsec = -1
+		runtime.Gosched()
+		return nil
+	}
+	// 有事件，继续无阻塞循环
+	e.waitMsec = 0
+	for _, event := range events {
+		// 通过fd查询到一个连接对象
+		v, ok := e.conns.Load(int(event.Fd))
+		if !ok {
+			continue
+		}
+		conn := v.(*EpollConnection)
+		// epoll关闭事件
+		if event.Events&EpollClose == uint32(EpollClose) {
+			if err := e.CloseConn(conn); err != nil {
+				return fmt.Errorf("close conn error: %v", err)
+			}
+			continue
+		}
+		// epoll in
+		if event.Events&syscall.EPOLLIN == syscall.EPOLLIN {
+			e.DispatchIO(conn, Read)
+		}
+		// epoll out
+		if event.Events&EpollWritable == EpollWritable {
+			e.DispatchIO(conn, Write)
+		}
+	}
+	return nil
 }
 
 // DispatchIO 主循环将io事件交给某个handler处理，handler通过round-robin策略选择

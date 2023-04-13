@@ -2,6 +2,7 @@ package tcp
 
 import (
 	"bytes"
+	"context"
 	"redigo/pkg/redis"
 	"redigo/pkg/util/buffer"
 	"sync"
@@ -47,8 +48,8 @@ func (c *EpollConnection) Write(payload []byte) (int, error) {
 }
 
 func (c *EpollConnection) ReadBuffered() (int, error) {
-	buf := bytesPool.Get().([]byte)
-	defer bytesPool.Put(buf)
+	buf := rawBytesPool.Get().([]byte)
+	defer rawBytesPool.Put(buf)
 	n, err := syscall.Read(c.fd, buf)
 	if err != nil {
 		return 0, err
