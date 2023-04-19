@@ -97,7 +97,7 @@ func execSRandomMember(db *SingleDB, command redis.Command) *redis.RespCommand {
 func execSRem(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("LREM"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("SREM"))
 	}
 	key := string(args[0])
 	s, err := getSet(db, key)
@@ -180,7 +180,7 @@ func execSDiff(db *SingleDB, command redis.Command) *redis.RespCommand {
 func execSDiffStore(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("SDIFF"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("SDIFFSTORE"))
 	}
 	s1, err := getSet(db, string(args[0]))
 	if err != nil {
@@ -205,7 +205,7 @@ func execSDiffStore(db *SingleDB, command redis.Command) *redis.RespCommand {
 	for _, value := range diff {
 		dest.Add(value)
 	}
-	db.data.Put(string(args[0]), &database.Entry{Data: dest})
+	db.data.Put(string(args[2]), &database.Entry{Data: dest})
 	db.addAof(command.Parts())
 	return redis.NewStringArrayCommand(diff)
 }
@@ -276,7 +276,7 @@ func execSCard(db *SingleDB, command redis.Command) *redis.RespCommand {
 func execSUnion(db *SingleDB, command redis.Command) *redis.RespCommand {
 	args := command.Args()
 	if !ValidateArgCount(command.Name(), len(args)) {
-		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("SINTER"))
+		return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("SUNION"))
 	}
 	s1, err := getSet(db, string(args[0]))
 	if err != nil {
