@@ -258,3 +258,8 @@ func typeOf(entry database.Entry) string {
 	}
 	return "none"
 }
+
+func buildExpireCommand(key string, ttl time.Duration) [][]byte {
+	expireAt := time.Now().Add(ttl).UnixMilli()
+	return [][]byte{[]byte("pexpireat"), []byte(key), []byte(strconv.FormatInt(expireAt, 10))}
+}

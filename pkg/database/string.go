@@ -46,31 +46,30 @@ func executeSet(db *SingleDB, command redis.Command) *redis.RespCommand {
 	var delay time.Duration
 	for i, a := range args {
 		arg := str.BytesToString(a)
-		if arg == "NX" {
+		switch {
+		case arg == "NX":
 			policy = insertPolicy
-		} else if arg == "XX" {
+		case arg == "XX":
 			policy = updatePolicy
-		} else if arg == "EX" || arg == "PX" {
+		case arg == "PX" || arg == "PX":
 			if expireTime != infiniteExpireTime || i == len(args)-1 {
 				return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("set "))
 			}
-			if num, err := strconv.Atoi(string(args[i+1])); err != nil {
+			if expireTime, err := strconv.Atoi(string(args[i+1])); err != nil {
 				log.Println("Error arg: ", arg)
 				return redis.NewErrorCommand(redis.HashValueNotIntegerError)
 			} else {
-				expireTime = num
 				switch arg {
 				case "EX":
 					delay = time.Duration(expireTime) * time.Second
 				case "PX":
 					delay = time.Duration(expireTime) * time.Millisecond
 				}
-
 			}
 		}
 	}
 
-	entry := &database.Entry{Key: key, Data: value, DataSize: int64(len(value))}
+	entry := database.NewEntry(key, value, len(value))
 	var result int
 	switch policy {
 	case defaultPolicy:
@@ -85,7 +84,7 @@ func executeSet(db *SingleDB, command redis.Command) *redis.RespCommand {
 	// set ttl
 	if expireTime != infiniteExpireTime {
 		db.Expire(key, delay)
-		db.addAof([][]byte{[]byte("pexpireat"), args[0], []byte(strconv.FormatInt(time.Now().Add(delay).UnixMilli(), 10))})
+		db.addAof(buildExpireCommand(key, delay))
 	} else {
 		// cancel old ttl
 		cancelled := db.CancelTTL(key)
