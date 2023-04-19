@@ -55,11 +55,10 @@ func executeSet(db *SingleDB, command redis.Command) *redis.RespCommand {
 			if expireTime != infiniteExpireTime || i == len(args)-1 {
 				return redis.NewErrorCommand(redis.CreateWrongArgumentNumberError("set "))
 			}
-			if num, err := strconv.Atoi(string(args[i+1])); err != nil {
+			if expireTime, err := strconv.Atoi(string(args[i+1])); err != nil {
 				log.Println("Error arg: ", arg)
 				return redis.NewErrorCommand(redis.HashValueNotIntegerError)
 			} else {
-				expireTime = num
 				switch arg {
 				case "EX":
 					delay = time.Duration(expireTime) * time.Second
@@ -70,7 +69,7 @@ func executeSet(db *SingleDB, command redis.Command) *redis.RespCommand {
 		}
 	}
 
-	entry := database.NewEntry(key, value, len(value))
+	entry := database.NewEntry(key, value)
 	var result int
 	switch policy {
 	case defaultPolicy:

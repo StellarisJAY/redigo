@@ -25,8 +25,13 @@ type DB interface {
 Entry key-value数据库entry，包括了key、value属性
 */
 type Entry struct {
-	Key      string
-	Data     interface{}
-	DataSize int64 // DataSize 数据大小
-	Accessed bool  // 最近是否被访问过
+	Key  string
+	Data any
+}
+
+func NewEntry(key string, value any) *Entry {
+	return &Entry{
+		Key:  key,
+		Data: value,
+	}
 }

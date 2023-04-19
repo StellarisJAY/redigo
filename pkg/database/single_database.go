@@ -40,7 +40,6 @@ func (db *SingleDB) SubmitCommand(_ redis.Command) {
 	panic(errors.New("unsupported operation"))
 }
 
-
 func (db *SingleDB) Execute(command redis.Command) *redis.RespCommand {
 	cmd := command.Name()
 	if cmd == "keys" {
@@ -276,7 +275,6 @@ func (db *SingleDB) putIfExists(key string, value []byte) int {
 		return 0
 	} else if entry, ok := v.(*database.Entry); ok {
 		entry.Data = value
-		entry.DataSize = int64(len(value))
 	}
 	return 0
 }
@@ -284,7 +282,6 @@ func (db *SingleDB) putIfExists(key string, value []byte) int {
 // updateEntry 更新entry中的值，该方法只能由于字符串类型的value
 func (db *SingleDB) updateEntry(entry *database.Entry, value []byte) {
 	entry.Data = value
-	entry.DataSize = int64(len(value))
 }
 
 func (db *SingleDB) onKeyEvict(key string, _ interface{}) {
