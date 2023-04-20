@@ -18,6 +18,10 @@ export BENCH_RAND_KEYS = 100000
 export BENCH_T = "set,get,lpush,lpop,rpush,rpop,hset,zadd,sadd"
 # behchmark pipeline reqs
 export BENCH_PIPELINE=1
+# pprof graphics http port
+export PPROF_WEB_PORT=8890
+# pprof profile seconds
+export PROFILE_SECS=10
 build:env
 	@GOOS=$(PLATFORM) GOARCH=$(ARCH) CGO_ENABLE=0 \
 	go build -o ./target/redigo cmd/server/main.go
@@ -27,3 +31,5 @@ env:
 	@go mod tidy
 benchmark:
 	@redis-benchmark -q -p $(BENCH_PORT) -r $(BENCH_RAND_KEYS) -c $(BENCH_CLIS) -n $(BENCH_N) -t $(BENCH_T) -P $(BENCH_PIPELINE)
+profile:
+	@go tool pprof -http="0.0.0.0:8890" -seconds=$(PROFILE_SECS) http://localhost:8899/debug/pprof/profile
