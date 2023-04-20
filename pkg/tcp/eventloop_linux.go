@@ -186,10 +186,11 @@ func (e *EpollEventLoop) DispatchIO(conn redis.Connection, flag byte) {
 }
 
 func (e *EpollIOHandler) Handle() {
+LOOP:
 	for {
 		select {
 		case <-e.manager.closeChan:
-			break
+			break LOOP
 		case task := <-e.tasks:
 			e.handleConn(task.conn.(*EpollConnection), task.flag)
 		}
